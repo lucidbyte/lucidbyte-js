@@ -1,6 +1,8 @@
 import auth0 from 'auth0-js';
 import 'regenerator-runtime/runtime';
 
+const endpoint = 'http://127.0.0.1:3001/graphql';
+
 function handleAuthResult(auth0Instance, onSuccess = () => {}) {
   return (err, authResult) => {
     if (this.isAuthenticated()) {
@@ -54,6 +56,10 @@ class AuthService {
     return this.parseHash;
   }
 
+  onAuthenticated = () =>
+    this.handleAuthentication()
+      .then(() => this.isAuthenticated())
+
   setSession = (authResult) => {
     // Set the time that the access token will expire at
     const expiresAt = JSON.stringify((authResult.expiresIn * 1000) + new Date().getTime());
@@ -104,6 +110,7 @@ class AuthService {
             this.setSession(authResult);
           } else {
             console.log(err);
+            alert(err);
           }
           // err if automatic parseHash fails
         });
@@ -158,7 +165,6 @@ export default function AuthInstance({
   };
 
   const constructApiUrl = (url) => {
-    const endpoint = '/graphql';
     const apiUrl = url || `${endpoint}/${projectID}`;
     return apiUrl;
   };
@@ -168,10 +174,10 @@ export default function AuthInstance({
       url: constructApiUrl(url),
       method: 'POST',
       headers: await constructRequestHeaders(),
-      data: JSON.stringify({
+      data: {
         query,
         variables
-      }),
+      },
     }).then(handlePromiseJSON)
       .then(handleJSONdata);
   };
