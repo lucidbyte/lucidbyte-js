@@ -1,7 +1,8 @@
 import auth0 from 'auth0-js';
 import 'regenerator-runtime/runtime';
 
-const endpoint = 'http://127.0.0.1:3001/graphql';
+const apiOrigin = 'http://127.0.0.1:3001';
+const endpoint = `${apiOrigin}/graphql`;
 
 function handleAuthResult(auth0Instance, onSuccess = () => {}) {
   return (err, authResult) => {
@@ -23,32 +24,53 @@ function handleAuthResult(auth0Instance, onSuccess = () => {}) {
 }
 
 class AuthService {
-  constructor({ clientID, audience, domain, redirectUri }) {
+  constructor({ clientID, audience, domain, redirectUri }, getDynamicConfig) {
     this.redirectUri = redirectUri;
-    this.authParams = {
-      clientID,
-      audience,
-      scope: 'openid profile email update:note'
-    };
 
-    this.auth0 = new auth0.WebAuth({
-      domain,
-      responseType: 'token id_token',
-      redirectUri,
-      ...this.authParams
+    this.auth0 = new Promise(async (resolve, reject) => {
+      let _clientID = clientID;
+      let _redirectUri = redirectUri;
+      try {
+        console.log('[1]', { _clientID, _redirectUri });
+
+        if (!clientID || !redirectUri) {
+          const { clientID: clientIDFromApi, defaultRedirectUri } = await getDynamicConfig();
+          _clientID = clientID || clientIDFromApi;
+          _redirectUri = redirectUri || defaultRedirectUri;
+          console.log('[2]', { _clientID, _redirectUri });
+        }
+      } catch(fetchErr) {
+        reject({ fetchErr });
+      }
+
+      this.authParams = {
+        clientID: _clientID,
+        audience,
+        scope: 'openid profile email update:note'
+      };
+
+      resolve(
+        new auth0.WebAuth({
+          domain,
+          responseType: 'token id_token',
+          redirectUri: _redirectUri,
+          ...this.authParams
+        })
+      );
     });
   }
 
-  login = () => {
-    this.auth0.authorize();
+  login = async () => {
+    (await this.auth0).authorize();
   }
 
   handleAuthentication() {
     if (this.parseHash) {
       return this.parseHash;
     }
-    this.parseHash = new Promise((resolve) => {
-      this.auth0.parseHash(handleAuthResult.call(this, this.auth0, () => {
+    this.parseHash = new Promise(async (resolve) => {
+      const auth0 = (await this.auth0);
+      auth0.parseHash(handleAuthResult.call(this, auth0, () => {
         // we are authorized!
         resolve();
       }));
@@ -101,8 +123,8 @@ class AuthService {
     const delay = expiresAt - Date.now();
     if (delay > 0) {
       const timeoutDelay = forceRenew ? 2000 : (delay - 5000);
-      this.tokenRenewalTimeout = setTimeout(() => {
-        this.auth0.checkSession({
+      this.tokenRenewalTimeout = setTimeout(async () => {
+        (await this.auth0).checkSession({
           redirectUri: this.redirectUri,
           ...this.authParams,
         }, (err, authResult) => {
@@ -124,6 +146,8 @@ export default function AuthInstance({
   // auth0 stuff
   audience,
   domain,
+
+  // (optional) we can get this from our api
   clientID,
   redirectUri,
 
@@ -136,17 +160,28 @@ export default function AuthInstance({
 
   const axios = require('axios');
 
+  const getDynamicConfig = async () => {
+    const res = await axios.get(`${apiOrigin}/api/project-config/${projectID}`)
+      .catch(err => {
+        console.log({ err });
+      });
+    // console.log({ res });
+    const { clientId: clientID, redirectUri: defaultRedirectUri } = res.data;
+    const config = { clientID, defaultRedirectUri };
+    return config;
+  };
+
   const auth = new AuthService({
     audience,
     domain,
     clientID,
     redirectUri
-  });
+  }, getDynamicConfig);
 
   const handlePromiseJSON = res => res.data;
   const handleJSONdata = json => {
     if (json.errors) {
-      throw('graphqlError: \n' + JSON.stringify(json.errors, null, 2));
+      console.error('graphqlError: \n' + JSON.stringify(json.errors, null, 2));
     }
     return json.data;
   };
