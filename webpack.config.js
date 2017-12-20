@@ -4,7 +4,9 @@ module.exports = {
   entry: './src/index.js',
   output: {
     libraryTarget: 'umd',
-    filename: './dist/noted-sdk.js'
+    filename: './dist/noted-sdk.js',
+    libraryExport: 'default',
+    library: 'notedSdk'
   },
   module: {
     rules: [

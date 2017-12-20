@@ -1,5 +1,24 @@
-import auth0 from 'auth0-js';
+/* global auth0 */
 import 'regenerator-runtime/runtime';
+
+const defaults = {
+  domain: 'synergy-apps.auth0.com',
+  audience: 'http://localhost:3001/graphql',
+};
+
+// load auth0 from cdn
+let auth0Load;
+if (document) {
+  const script = document.createElement('script');
+  const src = `http://cdn.auth0.com/js/auth0/8.12.1/auth0.min.js`;
+  script.src = src;
+  auth0Load = new Promise((resolve, reject) => {
+    script.onload = resolve;
+    script.onerror = reject;
+  });
+  auth0Load.catch(err => console.error(err));
+  document.body.appendChild(script);
+}
 
 const apiOrigin = 'http://127.0.0.1:3001';
 const endpoint = `${apiOrigin}/graphql`;
@@ -10,6 +29,7 @@ function handleAuthResult(auth0Instance, onSuccess = () => {}) {
       this.scheduleRenewal();
       return onSuccess();
     }
+
     if (authResult && authResult.accessToken && authResult.idToken) {
       this.setSession(authResult);
       // location.assign('/');
@@ -25,19 +45,14 @@ function handleAuthResult(auth0Instance, onSuccess = () => {}) {
 
 class AuthService {
   constructor({ clientID, audience, domain, redirectUri }, getDynamicConfig) {
-    this.redirectUri = redirectUri;
-
     this.auth0 = new Promise(async (resolve, reject) => {
       let _clientID = clientID;
       let _redirectUri = redirectUri;
       try {
-        console.log('[1]', { _clientID, _redirectUri });
-
         if (!clientID || !redirectUri) {
           const { clientID: clientIDFromApi, defaultRedirectUri } = await getDynamicConfig();
           _clientID = clientID || clientIDFromApi;
           _redirectUri = redirectUri || defaultRedirectUri;
-          console.log('[2]', { _clientID, _redirectUri });
         }
       } catch(fetchErr) {
         reject({ fetchErr });
@@ -46,14 +61,14 @@ class AuthService {
       this.authParams = {
         clientID: _clientID,
         audience,
-        scope: 'openid profile email update:note'
+        scope: 'openid profile email update:note',
+        redirectUri: _redirectUri
       };
 
       resolve(
         new auth0.WebAuth({
           domain,
           responseType: 'token id_token',
-          redirectUri: _redirectUri,
           ...this.authParams
         })
       );
@@ -124,23 +139,36 @@ class AuthService {
     if (delay > 0) {
       const timeoutDelay = forceRenew ? 2000 : (delay - 5000);
       this.tokenRenewalTimeout = setTimeout(async () => {
-        (await this.auth0).checkSession({
-          redirectUri: this.redirectUri,
-          ...this.authParams,
-        }, (err, authResult) => {
-          if (authResult) {
-            this.setSession(authResult);
-          } else {
-            console.log(err);
-            alert(err);
+        (await this.auth0).checkSession(
+          this.authParams,
+          (err, authResult) => {
+            if (authResult) {
+              this.setSession(authResult);
+            } else {
+              console.log(err);
+              alert(err);
+            }
+            // err if automatic parseHash fails
           }
-          // err if automatic parseHash fails
-        });
+        );
         // renew a little before expiration
       }, timeoutDelay);
     }
   }
 }
+
+const handlePromiseJSON = res => res.data;
+
+const handleJSONdata = json => {
+  if (json.errors) {
+    console.error('graphqlError: \n' + JSON.stringify(json.errors, null, 2));
+  }
+  return json.data;
+};
+
+const handleBatchData = (json) => {
+  return json.map(handleJSONdata);
+};
 
 export default function AuthInstance({
   // auth0 stuff
@@ -161,6 +189,7 @@ export default function AuthInstance({
   const axios = require('axios');
 
   const getDynamicConfig = async () => {
+    await auth0Load;
     const res = await axios.get(`${apiOrigin}/api/project-config/${projectID}`)
       .catch(err => {
         console.log({ err });
@@ -172,21 +201,14 @@ export default function AuthInstance({
   };
 
   const auth = new AuthService({
-    audience,
-    domain,
+    audience: audience || defaults.audience,
+    domain: domain || defaults.domain,
     clientID,
     redirectUri
   }, getDynamicConfig);
 
-  const handlePromiseJSON = res => res.data;
-  const handleJSONdata = json => {
-    if (json.errors) {
-      console.error('graphqlError: \n' + JSON.stringify(json.errors, null, 2));
-    }
-    return json.data;
-  };
-
   const constructRequestHeaders = async () => {
+    await auth0Load;
     await auth.handleAuthentication();
     const accessToken = auth.getSession().accessToken;
     const headers = {
@@ -217,9 +239,6 @@ export default function AuthInstance({
       .then(handleJSONdata);
   };
 
-  const handleBatchData = (json) => {
-    return json.map(handleJSONdata);
-  };
   // supports an array of queries
   gqlRequest.batch = async (queries = [], url) => {
     return axios({
