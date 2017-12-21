@@ -1,5 +1,7 @@
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
+const isDev = process.env.NODE_ENV === 'development';
+
 module.exports = {
   entry: './src/index.js',
   output: {
@@ -8,6 +10,7 @@ module.exports = {
     libraryExport: 'default',
     library: 'notedSdk'
   },
+  devtool: isDev ? 'cheap-module-eval-source-map' : false,
   module: {
     rules: [
       {
@@ -21,6 +24,8 @@ module.exports = {
     ]
   },
   plugins: [
-    new UglifyJsPlugin()
+    isDev
+      ? (v) => v
+      : new UglifyJsPlugin()
   ]
 };

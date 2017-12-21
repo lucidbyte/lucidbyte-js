@@ -64,7 +64,6 @@ class AuthService {
         scope: 'openid profile email update:note',
         redirectUri: _redirectUri
       };
-
       resolve(
         new auth0.WebAuth({
           domain,
@@ -72,6 +71,11 @@ class AuthService {
           ...this.authParams
         })
       );
+
+      this.auth0AuthApi = new auth0.Authentication({
+        domain,
+        clientID: _clientID
+      });
     });
   }
 
@@ -86,6 +90,7 @@ class AuthService {
     this.parseHash = new Promise(async (resolve) => {
       const auth0 = (await this.auth0);
       auth0.parseHash(handleAuthResult.call(this, auth0, () => {
+
         // we are authorized!
         resolve();
       }));
@@ -95,7 +100,22 @@ class AuthService {
 
   onAuthenticated = () =>
     this.handleAuthentication()
-      .then(() => this.isAuthenticated())
+      .then(async () => {
+        const isLoggedIn = this.isAuthenticated();
+        if (!isLoggedIn) {
+          return { isLoggedIn: false, userInfo: null };
+        }
+        const token = this.getSession().accessToken;
+        const userInfo = await new Promise((resolve, reject) => {
+          this.auth0AuthApi.userInfo(token, (err, info) => {
+            if (err) {
+              return reject(err);
+            }
+            resolve(info);
+          });
+        });
+        return { isLoggedIn, userInfo };
+      })
 
   setSession = (authResult) => {
     // Set the time that the access token will expire at
@@ -170,6 +190,20 @@ const handleBatchData = (json) => {
   return json.map(handleJSONdata);
 };
 
+const constructRequestHeaders = async (auth) => {
+  await auth0Load;
+  await auth.handleAuthentication();
+  const accessToken = auth.getSession().accessToken;
+  const headers = {
+    // Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return headers;
+};
+
 export default function AuthInstance({
   // auth0 stuff
   audience,
@@ -200,6 +234,11 @@ export default function AuthInstance({
     return config;
   };
 
+  const constructApiUrl = (url) => {
+    const apiUrl = url || `${endpoint}/${projectID}`;
+    return apiUrl;
+  };
+
   const auth = new AuthService({
     audience: audience || defaults.audience,
     domain: domain || defaults.domain,
@@ -207,30 +246,11 @@ export default function AuthInstance({
     redirectUri
   }, getDynamicConfig);
 
-  const constructRequestHeaders = async () => {
-    await auth0Load;
-    await auth.handleAuthentication();
-    const accessToken = auth.getSession().accessToken;
-    const headers = {
-      // Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    };
-    if (auth.isAuthenticated()) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
-    return headers;
-  };
-
-  const constructApiUrl = (url) => {
-    const apiUrl = url || `${endpoint}/${projectID}`;
-    return apiUrl;
-  };
-
   const gqlRequest = async (query, variables, url) => {
     return axios({
       url: constructApiUrl(url),
       method: 'POST',
-      headers: await constructRequestHeaders(),
+      headers: await constructRequestHeaders(auth),
       data: {
         query,
         variables
@@ -244,7 +264,7 @@ export default function AuthInstance({
     return axios({
       url: constructApiUrl(url),
       method: 'POST',
-      headers: await constructRequestHeaders(),
+      headers: await constructRequestHeaders(auth),
       data: JSON.stringify({ queries, batch: true }),
     }).then(handlePromiseJSON)
       .then(handleBatchData);
@@ -252,6 +272,6 @@ export default function AuthInstance({
 
   return {
     auth,
-    gqlRequest
+    gqlRequest,
   };
 }
