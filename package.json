@@ -7,12 +7,13 @@
     }
   },
   "author": "noted1",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "main": "dist/noted-sdk.js",
   "scripts": {
     "dev": "NODE_ENV=development webpack --watch",
     "dependencyStats": "webpack --profile --json > webpack-stats.json",
-    "build": "NODE_ENV=production webpack",
+    "publish": "NODE_ENV=production webpack",
+    "productionTest": "NODE_ENV=production webpack --watch",
     "test": "NODE_ENV=test jest --watchAll"
   },
   "devDependencies": {
@@ -37,6 +38,7 @@
   },
   "dependencies": {
     "axios": "^0.17.1",
+    "noted-js-sdk": "^2.0.0",
     "regenerator-runtime": "^0.11.1"
   }
 }

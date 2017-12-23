@@ -1,11 +1,10 @@
 import 'regenerator-runtime/runtime';
 
-// const defaults = {
-//   domain: 'synergy-apps.auth0.com',
-//   audience: 'http://localhost:3001/graphql',
-// };
+const isDev = process.env.NODE_ENV === 'development';
 
-const apiOrigin = 'http://localhost:3001';
+const apiOrigin = isDev
+  ? 'http://localhost:3000'
+  : 'https://test.lelandkwong.com';
 const endpoint = `${apiOrigin}/graphql`;
 
 const handlePromiseJSON = res => res.data;

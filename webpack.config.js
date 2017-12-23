@@ -1,4 +1,5 @@
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
+const webpack = require('webpack');
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -24,8 +25,15 @@ module.exports = {
     ]
   },
   plugins: [
-    isDev
-      ? (v) => v
-      : new UglifyJsPlugin()
+    (
+      isDev
+        ? (v) => v
+        : new UglifyJsPlugin()
+    ),
+    new webpack.DefinePlugin({
+      'process.env': {
+        NODE_ENV: JSON.stringify(process.env.NODE_ENV),
+      },
+    })
   ]
 };
