@@ -7,12 +7,12 @@
     }
   },
   "author": "noted1",
-  "version": "3.0.0",
+  "version": "5.0.0",
   "main": "dist/noted-sdk.js",
   "scripts": {
     "dev": "NODE_ENV=development webpack --watch",
     "dependencyStats": "webpack --profile --json > webpack-stats.json",
-    "publish": "NODE_ENV=production webpack",
+    "prepublish": "NODE_ENV=production webpack",
     "productionTest": "NODE_ENV=production webpack --watch",
     "test": "NODE_ENV=test jest --watchAll"
   },

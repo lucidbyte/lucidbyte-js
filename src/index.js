@@ -2,11 +2,6 @@ import 'regenerator-runtime/runtime';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-const apiOrigin = isDev
-  ? 'http://localhost:3000'
-  : 'https://test.lelandkwong.com';
-const endpoint = `${apiOrigin}/graphql`;
-
 const handlePromiseJSON = res => res.data;
 
 const handleJSONdata = json => {
@@ -16,11 +11,23 @@ const handleJSONdata = json => {
   return json.data;
 };
 
-const getSession = () => {
+const session = (
+  method, sessionParams = {}
+) => {
+  const {
+    accessToken,
+    expiresAt
+  } = sessionParams;
   return {
-    accessToken: localStorage.getItem('accessToken')
+    accessToken: localStorage[`${method}Item`]('accessToken', accessToken),
+    expiresAt: localStorage[`${method}Item`]('expiresAt', expiresAt)
   };
 };
+
+const getSession = () => session('get');
+const endSession = () => session('remove');
+const setSession = (sessionParams) => session('set', sessionParams);
+const hasSession = () => !!session('get').accessToken;
 
 const constructRequestHeaders = async () => {
   const accessToken = getSession().accessToken;
@@ -35,12 +42,21 @@ const constructRequestHeaders = async () => {
 };
 
 export default function AuthInstance({
+  origin: customOrigin,
   // noted-api config
   projectID
 }) {
-  if (!process.browser) {
+  if (typeof document === 'undefined') {
     return {};
   }
+
+  const apiOrigin = customOrigin
+    || (
+      isDev
+        ? 'http://localhost:3000'
+        : 'https://test.lelandkwong.com'
+    );
+  const endpoint = `${apiOrigin}/graphql`;
 
   const axios = require('axios');
 
@@ -62,7 +78,25 @@ export default function AuthInstance({
       .then(handleJSONdata);
   };
 
-  gqlRequest.login = async (email, projectID) => {
+  const isLoggedIn = () => {
+    return hasSession();
+  };
+
+  const callbacks = [];
+  const authStateChangeFn = () => {
+    callbacks.forEach(cb => cb({ loggedIn: hasSession() }));
+  };
+  const onAuthStateChange = (callback) => {
+    callbacks.push(callback);
+    authStateChangeFn();
+  };
+
+  const logout = () => {
+    endSession();
+    authStateChangeFn();
+  };
+
+  const login = async (email, projectID) => {
     return axios({
       url: constructApiUrl(`/api/login`),
       method: 'POST',
@@ -73,38 +107,58 @@ export default function AuthInstance({
         email,
         projectID
       }
-    }).then(res => {
-      console.log(res);
-    }).catch(err => {
-      console.log(err);
     });
   };
 
-  gqlRequest.logout = () => {
-    localStorage.removeItem('accessToken');
+  gqlRequest.getAccessToken = (loginCode) => {
+    return fetch(`/api/access-token/${loginCode}`, {
+      method: 'GET',
+    }).then(res => res.json())
+      .then(json => {
+        console.log(json);
+        setSession(json);
+        authStateChangeFn();
+        return json;
+      });
   };
 
-  gqlRequest.refreshToken = async () => {
+  const getRefreshToken = async () => {
     return axios({
       url: constructApiUrl(`/api/refresh-token`),
       headers: await constructRequestHeaders(),
       method: 'GET'
     }).then(res => {
-      const { accessToken } = res.data;
-      localStorage.setItem('accessToken', accessToken);
+      const { accessToken, expiresAt } = res.data;
+      setSession({ accessToken, expiresAt });
       return accessToken;
     });
   };
 
-  gqlRequest.checkSession = async () => {
-    return axios({
-      url: constructApiUrl(`/api/is-token-expired`),
-      headers: await constructRequestHeaders(),
-      method: 'GET'
-    });
+  let hasExpired = false;
+
+  const scheduleTokenRefresh = () => {
+    const { expiresAt } = getSession();
+    const padding = 1000 * 60 * 60;
+    const delay =  expiresAt - new Date().getTime() - padding;
+    hasExpired = delay <= 0;
+    if (!hasExpired) {
+      setTimeout(() => {
+        getRefreshToken()
+          .then(scheduleTokenRefresh);
+      }, delay);
+    } else {
+      logout();
+    }
   };
+
+  if (isLoggedIn()) {
+    scheduleTokenRefresh();
+  }
 
   return {
     gqlRequest,
+    login,
+    logout,
+    onAuthStateChange,
   };
 }
