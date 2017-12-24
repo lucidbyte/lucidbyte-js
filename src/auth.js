@@ -1,8 +1,6 @@
 import 'regenerator-runtime/runtime';
 import axios from 'axios';
 
-const isDev = process.env.NODE_ENV === 'development';
-
 const handlePromiseJSON = res => res.data;
 
 const handleJSONdata = json => {
@@ -44,27 +42,16 @@ const constructRequestHeaders = async () => {
 
 const constructApiUrl = (apiRoute = '', projectID, customOrigin) => {
   const apiOrigin = customOrigin
-    || (
-      isDev
-        ? 'http://localhost:3000'
-        : 'https://test.lelandkwong.com'
-    );
+    || 'https://test.lelandkwong.com';
+
   const endpoint = `${apiOrigin}/graphql`;
 
   const apiUrl = apiRoute ? `${apiOrigin}${apiRoute}` : `${endpoint}/${projectID}`;
   return apiUrl;
 };
 
-export default function AuthInstance({
-  origin: customOrigin,
-  // noted-api config
-  projectID
-}) {
-  if (typeof document === 'undefined') {
-    return {};
-  }
-
-  const client = async (query, variables, url) => {
+const client = ({ projectID, origin: customOrigin }) =>
+  async (query, variables, url) => {
     return axios({
       url: constructApiUrl(url, projectID, customOrigin),
       method: 'POST',
@@ -77,25 +64,32 @@ export default function AuthInstance({
       .then(handleJSONdata);
   };
 
-  const isLoggedIn = () => {
-    return hasSession();
-  };
+const isLoggedIn = () => {
+  return hasSession();
+};
 
-  const callbacks = [];
-  const authStateChangeFn = () => {
-    callbacks.forEach(cb => cb({ loggedIn: hasSession() }));
-  };
-  const onAuthStateChange = (callback) => {
-    callbacks.push(callback);
-    authStateChangeFn();
-  };
+const authStateChangeCallbacks = [];
 
-  const logout = () => {
-    endSession();
-    authStateChangeFn();
-  };
+const authStateChangeFn = () => {
+  authStateChangeCallbacks
+    .forEach(cb => cb({ loggedIn: hasSession() }));
+};
+const onAuthStateChange = (callback) => {
+  authStateChangeCallbacks.push(callback);
+  authStateChangeFn();
+};
 
-  const login = async (email, projectID) => {
+const logout = () => {
+  endSession();
+  authStateChangeFn();
+};
+
+const AuthInstance = ({ origin: customOrigin, projectID }) => {
+  if (typeof document === 'undefined') {
+    return {};
+  }
+
+  const login = async (email) => {
     return axios({
       url: constructApiUrl(`/api/login`, projectID, customOrigin),
       method: 'POST',
@@ -110,7 +104,8 @@ export default function AuthInstance({
   };
 
   const getAccessToken = (loginCode) => {
-    return fetch(`/api/access-token/${loginCode}`, {
+    const url = constructApiUrl(`/api/access-token/${loginCode}`, projectID, customOrigin);
+    return fetch(url, {
       method: 'GET',
     }).then(res => res.json())
       .then(json => {
@@ -155,12 +150,14 @@ export default function AuthInstance({
   }
 
   return {
-    client,
-    auth: {
-      getAccessToken,
-      login,
-      logout,
-      onAuthStateChange,
-    }
+    getAccessToken,
+    login,
+    logout,
+    onAuthStateChange,
   };
-}
+};
+
+export default {
+  auth: AuthInstance,
+  client
+};

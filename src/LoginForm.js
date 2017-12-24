@@ -41,13 +41,11 @@ export default class LoginForm extends Component {
   }
 
   componentDidMount() {
-    const { projectID } = this.props;
+    const { projectID, customOrigin } = this.props;
     const {
-      auth: {
-        getAccessToken,
-        login,
-      }
-    } = require('./auth').default({ projectID });
+      getAccessToken,
+      login,
+    } = require('./auth').default.auth({ projectID, origin: customOrigin });
     this.login = login;
     this.getAccessToken = getAccessToken;
   }
@@ -71,10 +69,7 @@ export default class LoginForm extends Component {
   handleCodeSubmit = (ev) => {
     ev.preventDefault();
     const loginCode = this.state.code;
-    this.getAccessToken(loginCode)
-      .then(() => {
-        location.assign('/account');
-      });
+    this.getAccessToken(loginCode);
   }
 
   handleCodeChange = (ev) => {
@@ -107,11 +102,13 @@ export default class LoginForm extends Component {
 
 LoginForm.render = ({
   projectID,
+  origin,
   element
 }) => {
   render(
     <LoginForm
       projectID={projectID}
+      customOrigin={origin}
     />,
     element
   );
