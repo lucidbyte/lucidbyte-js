@@ -15,11 +15,13 @@ const session = (
 ) => {
   const {
     accessToken,
-    expiresAt
+    expiresAt,
+    userId
   } = sessionParams;
   return {
     accessToken: localStorage[`${method}Item`]('accessToken', accessToken),
-    expiresAt: localStorage[`${method}Item`]('expiresAt', expiresAt)
+    expiresAt: localStorage[`${method}Item`]('expiresAt', expiresAt),
+    userId: localStorage[`${method}Item`]('userId', userId),
   };
 };
 
@@ -70,13 +72,16 @@ const isLoggedIn = () => {
 
 const authStateChangeCallbacks = [];
 
-const authStateChangeFn = () => {
+const authStateChangeFn = (userID) => {
   authStateChangeCallbacks
-    .forEach(cb => cb({ loggedIn: hasSession() }));
+    .forEach(cb => cb({
+      loggedIn: hasSession(),
+      userId: userID || null
+    }));
 };
 const onAuthStateChange = (callback) => {
   authStateChangeCallbacks.push(callback);
-  authStateChangeFn();
+  authStateChangeFn(getSession().userId);
 };
 
 const logout = () => {
@@ -109,21 +114,25 @@ const AuthInstance = ({ origin: customOrigin, projectID }) => {
       method: 'GET',
     }).then(res => res.json())
       .then(json => {
-        console.log(json);
-        setSession(json);
-        authStateChangeFn();
+        const { accessToken, expiresAt, userID } = json;
+        if (json.errors) {
+          endSession();
+          return json;
+        }
+        setSession({ accessToken, expiresAt, userId: userID });
+        authStateChangeFn(userID);
         return json;
       });
   };
 
   const getRefreshToken = async () => {
     return axios({
-      url: constructApiUrl(`/api/refresh-token`, projectID, customOrigin),
+      url: constructApiUrl(`/api/refresh-token/${projectID}`, null, customOrigin),
       headers: await constructRequestHeaders(),
       method: 'GET'
     }).then(res => {
       const { accessToken, expiresAt } = res.data;
-      setSession({ accessToken, expiresAt });
+      setSession({ accessToken, expiresAt, userId: getSession().userId });
       return accessToken;
     });
   };
