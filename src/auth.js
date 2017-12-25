@@ -1,5 +1,6 @@
 import 'regenerator-runtime/runtime';
 import axios from 'axios';
+import { baseApiUrl } from './config';
 
 const handlePromiseJSON = res => res.data;
 
@@ -44,7 +45,7 @@ const constructRequestHeaders = async () => {
 
 const constructApiUrl = (apiRoute = '', projectID, customOrigin) => {
   const apiOrigin = customOrigin
-    || 'https://test.lelandkwong.com';
+    || baseApiUrl;
 
   const endpoint = `${apiOrigin}/graphql`;
 
@@ -65,6 +66,21 @@ const client = ({ projectID, origin: customOrigin }) =>
     }).then(handlePromiseJSON)
       .then(handleJSONdata);
   };
+
+const anonymousCollection = () => {
+  const projectID = location.origin;
+  return (query, variables, origin = baseApiUrl) => {
+    const url = `${origin}/graphql/${projectID}`;
+    return axios({
+      url,
+      method: 'POST',
+      data: {
+        query,
+        variables
+      }
+    });
+  };
+};
 
 const isLoggedIn = () => {
   return hasSession();
@@ -170,5 +186,6 @@ const AuthInstance = ({ origin: customOrigin, projectID }) => {
 
 export default {
   auth: AuthInstance,
-  client
+  client,
+  anonymousCollection
 };

@@ -260,3 +260,17 @@ LoginForm.render = ({
     element
   );
 };
+
+// auto render the login form if #LoginForm element exists
+if (process.browser) {
+  const element = document.querySelector('#LoginForm');
+  if (element) {
+    const origin = element.getAttribute('origin');
+    const projectID = element.getAttribute('project-id');
+    LoginForm.render({
+      element,
+      origin,
+      projectID
+    });
+  }
+}
