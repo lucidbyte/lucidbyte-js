@@ -67,19 +67,25 @@ const client = ({ projectID, origin: customOrigin }) =>
       .then(handleJSONdata);
   };
 
-const anonymousCollection = () => {
-  const projectID = location.origin;
-  return (query, variables, origin = baseApiUrl) => {
-    const url = `${origin}/graphql/${projectID}`;
-    return axios({
-      url,
-      method: 'POST',
-      data: {
-        query,
-        variables
-      }
-    });
-  };
+const anonymousProject = ({
+  query,
+  variables,
+  apiOrigin = baseApiUrl
+}) => {
+  const ns = '__anonymousProjectId__';
+  const shortid = localStorage.getItem(ns)
+    || require('shortid').generate();
+  localStorage.setItem(ns, shortid);
+  const projectID = `anon-${shortid}`;
+  const url = `${apiOrigin}/graphql/${projectID}`;
+  return axios({
+    url,
+    method: 'POST',
+    data: {
+      query,
+      variables
+    }
+  });
 };
 
 const isLoggedIn = () => {
@@ -187,5 +193,5 @@ const AuthInstance = ({ origin: customOrigin, projectID }) => {
 export default {
   auth: AuthInstance,
   client,
-  anonymousCollection
+  anonymousProject
 };

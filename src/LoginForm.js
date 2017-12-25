@@ -262,7 +262,7 @@ LoginForm.render = ({
 };
 
 // auto render the login form if #LoginForm element exists
-if (process.browser) {
+if (typeof document !== 'undefined') {
   const element = document.querySelector('#LoginForm');
   if (element) {
     const origin = element.getAttribute('origin');
