@@ -14,14 +14,50 @@ const ErrorMessage = ({ error }) => {
   );
 };
 
+class Input extends Component {
+  componentDidMount() {
+    this.props.autofocus &&
+      this.elem.focus();
+
+    if (this.props.autofocusOnWindowFocus) {
+      window.addEventListener('focus', this.windowFocusHandler);
+    }
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('focus', this.windowFocusHandler);
+  }
+
+  windowFocusHandler = () => this.elem.focus()
+
+  ref = (ref) => this.elem = ref
+
+  render() {
+    const {
+      autofocus,
+      autofocusOnWindowFocus, // eslint-disable-line no-unused-vars
+      ...rest
+    } = this.props;
+    return (
+      <input
+        autofocus={autofocus}
+        ref={this.ref}
+        {...rest}
+      />
+    );
+  }
+}
+
 const EmailPrompt = ({ onSubmit, onInput, value }) => (
   <form className='Login__EmailForm' onSubmit={onSubmit}>
     <h2 className='Login__EmailTitle'>Authenticate</h2>
     <p>To sign up or log in, fill in your email address below:</p>
-    <input
-      className='Login__EmailInput input'
+    <Input
+      className='Login__EmailInput'
       type='email'
       autoComplete='email'
+      autofocus={true}
+      autofocusOnWindowFocus={true}
       placeholder='your_email@domain.com'
       value={value}
       onInput={onInput}
@@ -41,14 +77,19 @@ const AwaitingConfirmation = ({ onSubmit, onInput, onUndo, value, email, error }
       <p>Please login to to your <strong>{emailDomain}</strong> account, and copy the code into the field below.</p>
       <form onSubmit={onSubmit}>
         <ErrorMessage error={error} />
-        <input
-          className='Login__CodeInput input'
+        <Input
+          className='Login__CodeInput'
+          autofocus={true}
           type='text'
-          placeholder='your code'
+          placeholder='enter code here'
           value={value}
+          autofocusOnWindowFocus={true}
           onInput={onInput}
         />
       </form>
+      <p className='Login__CodeWaitingMessage'>
+        Waiting for code...
+      </p>
     </div>
   );
 };
@@ -131,12 +172,23 @@ export default class LoginForm extends Component {
 
           .Login {
             text-align: center;
-            max-width: 35rem;
+            max-width: 33rem;
             margin: 0 auto;
           }
 
           .Login input {
-            text-align: center;
+            text-align: inherit;
+            line-height: 2.2;
+            font-family: inherit;
+            font-size: inherit;
+            width: 100%;
+            border: 1px solid #d2d0d0;
+            box-shadow: inset 0px 1px 1px rgba(0,0,0,.1);
+          }
+
+          .Login input:focus {
+            border-color: rgb(1, 93, 201);
+            outline: none;
           }
 
           .Login h2 {
@@ -149,6 +201,27 @@ export default class LoginForm extends Component {
             background: rgb(204, 55, 53);
             color: #fff;
             padding: .4em;
+          }
+
+          @keyframes pulseCodeWaitingMessage {
+            0% {
+              opacity: 0;
+            }
+
+            50% {
+              opacity: 1;
+            }
+
+            100% {
+              opacity: 0;
+            }
+          }
+
+          .Login__CodeWaitingMessage {
+            font-size: .9em;
+            opacity: 0;
+            margin-top: 1em;
+            animation: pulseCodeWaitingMessage 5s 2s infinite;
           }
         `}</style>
         {!this.state.emailSent
