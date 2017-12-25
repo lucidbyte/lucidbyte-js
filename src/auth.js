@@ -70,6 +70,8 @@ const isLoggedIn = () => {
   return hasSession();
 };
 
+// callbacks are global since there should only
+// be one instance of authentication happening at any given time
 const authStateChangeCallbacks = [];
 
 const authStateChangeFn = (userID) => {
@@ -115,7 +117,7 @@ const AuthInstance = ({ origin: customOrigin, projectID }) => {
     }).then(res => res.json())
       .then(json => {
         const { accessToken, expiresAt, userID } = json;
-        if (json.errors) {
+        if (json.error) {
           endSession();
           return json;
         }
@@ -129,7 +131,7 @@ const AuthInstance = ({ origin: customOrigin, projectID }) => {
     return axios({
       url: constructApiUrl(`/api/refresh-token/${projectID}`, null, customOrigin),
       headers: await constructRequestHeaders(),
-      method: 'GET'
+      method: 'GET',
     }).then(res => {
       const { accessToken, expiresAt } = res.data;
       setSession({ accessToken, expiresAt, userId: getSession().userId });
