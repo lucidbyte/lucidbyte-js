@@ -176,6 +176,10 @@ export default class LoginForm extends Component {
             margin: 0 auto;
           }
 
+          .Login * {
+            box-sizing: border-box;
+          }
+
           .Login input {
             text-align: inherit;
             line-height: 2.2;
@@ -260,17 +264,3 @@ LoginForm.render = ({
     element
   );
 };
-
-// auto render the login form if #LoginForm element exists
-if (typeof document !== 'undefined') {
-  const element = document.querySelector('#LoginForm');
-  if (element) {
-    const origin = element.getAttribute('origin');
-    const projectID = element.getAttribute('project-id');
-    LoginForm.render({
-      element,
-      origin,
-      projectID
-    });
-  }
-}

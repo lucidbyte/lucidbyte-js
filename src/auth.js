@@ -109,7 +109,12 @@ const logout = () => {
   authStateChangeFn();
 };
 
-const AuthInstance = ({ origin: customOrigin, projectID }) => {
+const AuthInstance = ({
+  // this is for testing purposes only, normally the origin
+  // should be pointing the the production server
+  origin: customOrigin,
+  projectID
+}) => {
   if (typeof document === 'undefined') {
     return {};
   }
