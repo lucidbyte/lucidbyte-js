@@ -72,11 +72,7 @@ const anonymousProject = ({
   variables,
   apiOrigin = baseApiUrl
 }) => {
-  const ns = '__anonymousProjectId__';
-  const shortid = localStorage.getItem(ns)
-    || require('shortid').generate();
-  localStorage.setItem(ns, shortid);
-  const projectID = `anon-${shortid}`;
+  const projectID = `anon`;
   const url = `${apiOrigin}/graphql/${projectID}`;
   return axios({
     url,
