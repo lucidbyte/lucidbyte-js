@@ -69,7 +69,7 @@ const client = ({ projectID, origin: customOrigin }) =>
 
 const anonymousProject = ({
   query,
-  variables,
+  variables = {},
   apiOrigin = baseApiUrl
 }) => {
   const projectID = `anon`;
@@ -81,7 +81,7 @@ const anonymousProject = ({
       query,
       variables
     }
-  });
+  }).then((res) => res.data.data);
 };
 
 const isLoggedIn = () => {
