@@ -53,35 +53,93 @@ const constructApiUrl = (apiRoute = '', projectID, customOrigin) => {
   return apiUrl;
 };
 
-const client = ({ projectID, origin: customOrigin }) =>
-  async (query, variables, url) => {
-    return axios({
-      url: constructApiUrl(url, projectID, customOrigin),
+const client = ({
+  projectID,
+  // the following props are only for testing purposes
+  origin: customOrigin,
+  path = `/graphql/${projectID}`
+}) => {
+  const request = async (
+    query,
+    variables,
+    action = null,
+    type = null // Query | Mutation
+  ) => {
+    const body = action
+      ? {
+        query,
+        variables,
+        action,
+        type
+      }
+      : {
+        query,
+        variables,
+      };
+    const response = axios({
+      url: constructApiUrl(path, projectID, customOrigin),
       method: 'POST',
       headers: await constructRequestHeaders(),
-      data: {
-        query,
-        variables
-      },
-    }).then(handlePromiseJSON)
-      .then(handleJSONdata);
-  };
-
-const anonymousProject = ({
-  query,
-  variables = {},
-  apiOrigin = baseApiUrl
-}) => {
-  const projectID = `anon`;
-  const url = `${apiOrigin}/graphql/${projectID}`;
-  return axios({
-    url,
-    method: 'POST',
-    data: {
-      query,
-      variables
+      data: body,
+    });
+    const isGraphql = typeof query === 'string';
+    if (isGraphql) {
+      return response.then(handlePromiseJSON)
+        .then(handleJSONdata);
     }
-  }).then((res) => res.data.data);
+    return response;
+  };
+  let operations = {};
+  let opResponse;
+  let opTimer;
+  let promiseResolver;
+  const batchDelay = 0;
+  request.collection = (collection) => {
+    const filter = (filters = {}) => {
+      const set = (query, actionType = 0) => {
+        operations[collection] = operations[collection] || [];
+        const op = query
+          ? [actionType, filters, query]
+          : [actionType, filters];
+        operations[collection].push(op);
+        clearTimeout(opTimer);
+        const batchPromise = opResponse =
+          opResponse || new Promise((resolve) => {
+            promiseResolver = () => {
+              resolve(
+                request(operations, null, 'updateNote', 'Mutation')
+              );
+              // reset batch
+              operations = {};
+              opResponse = null;
+            };
+          });
+        opTimer = setTimeout(promiseResolver, batchDelay);
+        return batchPromise.then(res => {
+          const newRes = Object.create(res);
+          newRes.data = res.data[collection];
+          return newRes;
+        });
+      };
+      const get = (query) => {
+        query.collection = collection;
+        return request(query, null, 'allNotes', 'Query');
+      };
+      const del = () => {
+        return set(null, 1);
+      };
+      return { get, set, delete: del };
+    };
+
+    return {
+      filter
+    };
+  };
+  request.flush = () => {
+    promiseResolver();
+    clearTimeout(opTimer);
+  };
+  return request;
 };
 
 const isLoggedIn = () => {
@@ -194,5 +252,4 @@ const AuthInstance = ({
 export default {
   auth: AuthInstance,
   client,
-  anonymousProject
 };
