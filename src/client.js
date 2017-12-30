@@ -61,10 +61,9 @@ export default ({
   let opResponse;
   let opTimer;
   let promiseResolver;
-  let filtersScope;
   /*
-    Cumulative JSON string payload. This is used to check if payload is too large
-    or when to flush the current batch.
+    Cumulative JSON string payload. This is used to check if payload is too
+    large.
    */
   let totalRequestContent = '';
   const batchDelay = 0;
@@ -80,12 +79,17 @@ export default ({
     return response;
   };
 
-  request.collection = (collection) => {
+  class Operators {
+    constructor(collection, filter) {
+      this.collection = collection;
+      this.filter = filter;
+    }
 
-    const set = (query, actionType = 0) => {
+    set(query, actionType = 0) {
+      const { filter } = this;
       const op = query
-        ? [actionType, filtersScope, query]
-        : [actionType, filtersScope];
+        ? [actionType, filter, query]
+        : [actionType, filter];
 
       if (dev()) {
         const payloadString = JSON.stringify(op);
@@ -104,6 +108,7 @@ export default ({
         totalRequestContent += payloadString;
       }
 
+      const { collection } = this;
       operations[collection] = operations[collection] || [];
       operations[collection].push(op);
       const batchPromise = opResponse =
@@ -122,30 +127,30 @@ export default ({
       }).catch(err => {
         console.error(err);
       });
-    };
+    }
 
-    const setMany = (query) => {
-      return set(query, 3);
-    };
+    setMany(query) {
+      return this.set(query, 3);
+    }
 
-    const get = (query = {}) => {
-      query.collection = collection;
+    get(query = {}) {
+      query.filter = this.filter;
+      query.collection = this.collection;
       return request(query, null, 'allNotes', 'Query');
-    };
+    }
 
-    const del = () => {
-      return set(null, 1);
-    };
+    delete() {
+      return this.set(null, 1);
+    }
 
-    const deleteMany = () => {
-      return set(null, 2);
-    };
+    deleteMany = () => {
+      return this.set(null, 2);
+    }
+  }
 
-    const methods = { get, set, delete: del, deleteMany, setMany };
-
+  request.collection = (collection) => {
     const filter = (filters = {}) => {
-      filtersScope = filters;
-      return methods;
+      return new Operators(collection, filters);
     };
 
     return {
