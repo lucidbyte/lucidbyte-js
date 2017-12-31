@@ -2,15 +2,6 @@ import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
 import axios from 'axios';
 
-let devEnabled = false;
-const dev = (arg) => {
-  if (arg) {
-    const { enabled } = arg;
-    devEnabled = enabled;
-  }
-  return devEnabled;
-};
-
 const handlePromiseJSON = res => res.data;
 
 const handleJSONdata = json => {
@@ -24,33 +15,40 @@ const maxContentSize = 1024 * 1000; // 1mb
 
 export default ({
   projectID,
+  dev = false,
   // the following props are only for testing purposes
   origin: customOrigin,
-  path = `/graphql/${projectID}`
+  path: customPath
 }) => {
   const request = async (
     query,
     variables,
-    action = null,
-    type = null // Query | Mutation
+    queryType = '', // Query | Mutation
   ) => {
-    const body = action
+    const isGraphql = !!variables;
+    const body = isGraphql
       ? {
         query,
-        action,
-        type
+        variables,
       }
       : {
-        query,
-        variables,
+        payload: query,
       };
+    if (dev) {
+      body.dev = 1;
+    }
+    const path = customPath
+      || (
+        isGraphql
+          ? `/api/graphql/${projectID}`
+          : `/api/main/${queryType}/${projectID}`
+      );
     const response = axios({
       url: constructApiUrl(path, projectID, customOrigin),
       method: 'POST',
       headers: await constructRequestHeaders(),
       data: body,
     });
-    const isGraphql = typeof query === 'string';
     if (isGraphql) {
       return response.then(handlePromiseJSON)
         .then(handleJSONdata);
@@ -79,26 +77,27 @@ export default ({
     return response;
   };
 
-  class Operators {
-    constructor(collection, filter) {
+  class Methods {
+    constructor(collection) {
       this.collection = collection;
-      this.filter = filter;
+      this._filter = {};
     }
 
-    set(query, actionType = 0) {
-      const { filter } = this;
+    set(query, options, methodType = 0) {
+      const { _filter: filter } = this;
       const op = query
-        ? [actionType, filter, query]
-        : [actionType, filter];
+        ? [methodType, filter, query]
+        : [methodType, filter];
+      if (options) {
+        op.push(options);
+      }
 
-      if (dev()) {
+      if (dev) {
         const payloadString = JSON.stringify(op);
         const batchSizeTooLarge = totalRequestContent.length + payloadString.length >= maxContentSize;
         if (batchSizeTooLarge) {
-          const error =
-      `Payload exceeded max of ${maxContentSize}.\n
-      Try breaking up requests into smaller chunks with \`flush\` method.
-      `;
+          const error = `Payload exceeded max of ${maxContentSize}.\n` +
+            `Try breaking up requests into smaller chunks with \`flush\` method.`;
           return Promise.reject({
             error,
             payloadSize: payloadString.length,
@@ -109,12 +108,12 @@ export default ({
       }
 
       const { collection } = this;
-      operations[collection] = operations[collection] || [];
-      operations[collection].push(op);
-      const batchPromise = opResponse =
-        opResponse || new Promise((resolve, reject) => {
+      const opsList = operations[collection] = operations[collection] || [];
+      opsList.push(op);
+      const batchPromise = opResponse = opResponse
+        || new Promise((resolve, reject) => {
           promiseResolver = () => {
-            request(operations, null, 'updateNote', 'Mutation')
+            request(operations, null, 'Mutation')
               .then(resolve)
               .catch(reject);
           };
@@ -130,32 +129,36 @@ export default ({
     }
 
     setMany(query) {
-      return this.set(query, 3);
+      return this.set(query, null, 3);
     }
 
     get(query = {}) {
-      query.filter = this.filter;
+      query.filter = this._filter;
       query.collection = this.collection;
-      return request(query, null, 'allNotes', 'Query');
+      return request(query, null, 'Query');
     }
 
     delete() {
-      return this.set(null, 1);
+      return this.set(null, null, 1);
     }
 
-    deleteMany = () => {
-      return this.set(null, 2);
+    deleteMany() {
+      return this.set(null, null, 2);
+    }
+
+    filter(filter) {
+      const props = {
+        _filter: {
+          writable: false,
+          value: filter
+        }
+      };
+      return Object.create(this, props);
     }
   }
 
   request.collection = (collection) => {
-    const filter = (filters = {}) => {
-      return new Operators(collection, filters);
-    };
-
-    return {
-      filter
-    };
+    return new Methods(collection);
   };
 
   request.flush = flush;
