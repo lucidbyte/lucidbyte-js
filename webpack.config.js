@@ -7,9 +7,9 @@ module.exports = {
   entry: './src/index.js',
   output: {
     libraryTarget: 'umd',
-    filename: './dist/noted-sdk.js',
+    filename: './dist/frontport.js',
     libraryExport: 'default',
-    library: 'notedSdk'
+    library: 'frontport'
   },
   devtool: isDev ? 'cheap-module-eval-source-map' : false,
   module: {
