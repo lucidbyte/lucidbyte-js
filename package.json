@@ -1,5 +1,5 @@
 {
-  "name": "lucidbyte-js",
+  "name": "@lucidbyte/lucidbyte-js",
   "jest": {
     "moduleNameMapper": {
       "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__mocks__/fileMock.js",
@@ -7,7 +7,7 @@
     }
   },
   "author": "lucidbyte",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "main": "dist/lucidbyte.js",
   "scripts": {
     "start:dev": "NODE_ENV=development webpack-dev-server",
@@ -48,5 +48,18 @@
     "preact": "^8.2.7",
     "regenerator-runtime": "^0.11.1",
     "shortid": "^2.2.8"
-  }
+  },
+  "description": "sdk for lucidbyte frontend database",
+  "directories": {
+    "example": "examples"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Leland-Kwong/lucidbyte-js.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Leland-Kwong/lucidbyte-js/issues"
+  },
+  "homepage": "https://github.com/Leland-Kwong/lucidbyte-js#readme"
 }
