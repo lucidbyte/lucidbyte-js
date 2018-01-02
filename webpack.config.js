@@ -4,14 +4,21 @@ const webpack = require('webpack');
 const isDev = process.env.NODE_ENV === 'development';
 
 module.exports = {
-  entry: './src/index.js',
+  entry: {
+    lucidbyte: './src/index.js',
+    'lucidbyte-examples': './src/examples/todos/src/index.js'
+  },
   output: {
     libraryTarget: 'umd',
-    filename: './dist/frontport.js',
+    filename: './dist/[name].js',
     libraryExport: 'default',
-    library: 'frontport'
+    library: 'lucidbyte'
   },
   devtool: isDev ? 'cheap-module-eval-source-map' : false,
+  devServer: {
+    compress: true,
+    port: 3003
+  },
   module: {
     rules: [
       {

@@ -1,7 +1,7 @@
-import { h, render, Component } from 'preact';
-
 // Tell Babel to transform JSX into h() calls:
 /** @jsx h */
+
+import { h, render, Component } from 'preact';
 
 const ErrorMessage = ({ error }) => {
   if (!error) {
@@ -154,7 +154,10 @@ export default class LoginForm extends Component {
     this.setState(initialState());
   }
 
-  render() {
+  render(props, state) {
+    if (props.unmounted) {
+      return null;
+    }
     return (
       <div className='Login'>
         <style>{/* @css */`
@@ -228,18 +231,18 @@ export default class LoginForm extends Component {
             animation: pulseCodeWaitingMessage 5s 2s infinite;
           }
         `}</style>
-        {!this.state.emailSent
+        {!state.emailSent
           ? (
             <EmailPrompt
               onInput={this.handleEmailChange}
               onSubmit={this.handleSubmit}
-              value={this.state.email}
+              value={state.email}
             />
           ) : (
             <AwaitingConfirmation
-              value={this.state.code}
-              email={this.state.email}
-              error={this.state.codeError}
+              value={state.code}
+              email={state.email}
+              error={state.codeError}
               onInput={this.handleCodeChange}
               onSubmit={this.handleCodeSubmit}
               onUndo={this.handleRestart}
@@ -254,12 +257,14 @@ export default class LoginForm extends Component {
 LoginForm.render = ({
   projectID,
   origin,
-  element
+  element,
+  unmounted = false
 }) => {
   render(
     <LoginForm
       projectID={projectID}
       customOrigin={origin}
+      unmounted={unmounted}
     />,
     element
   );
