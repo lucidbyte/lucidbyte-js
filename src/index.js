@@ -1,3 +1,5 @@
-const AuthInstance = require('./auth').default;
-AuthInstance.LoginForm = require('./LoginForm').default;
-export default AuthInstance;
+export default {
+  auth: require('./auth').default,
+  client: require('./client').default,
+  LoginForm: require('./LoginForm').default
+};

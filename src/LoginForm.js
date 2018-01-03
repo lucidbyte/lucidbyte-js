@@ -110,7 +110,7 @@ export default class LoginForm extends Component {
     const {
       getAccessToken,
       login,
-    } = require('./auth').default.auth({ projectID, origin: customOrigin });
+    } = require('./auth').default({ projectID, origin: customOrigin });
     this.login = login;
     this.getAccessToken = getAccessToken;
   }

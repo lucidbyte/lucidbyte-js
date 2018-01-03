@@ -1,6 +1,4 @@
 import 'regenerator-runtime/runtime';
-import axios from 'axios';
-import client from './client';
 import session from './session';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
@@ -41,16 +39,16 @@ const AuthInstance = ({
   }
 
   const login = async (email) => {
-    return axios({
-      url: constructApiUrl(`/api/login`, projectID, customOrigin),
+    const url = constructApiUrl(`/api/login`, projectID, customOrigin);
+    return fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      data: {
+      body: JSON.stringify({
         email,
         projectID
-      }
+      })
     });
   };
 
@@ -72,8 +70,8 @@ const AuthInstance = ({
   };
 
   const getRefreshToken = async () => {
-    return axios({
-      url: constructApiUrl(`/api/refresh-token/${projectID}`, null, customOrigin),
+    const url = constructApiUrl(`/api/refresh-token/${projectID}`, null, customOrigin);
+    return fetch(url, {
       headers: await constructRequestHeaders(),
       method: 'GET',
     }).then(res => {
@@ -112,7 +110,4 @@ const AuthInstance = ({
   };
 };
 
-export default {
-  auth: AuthInstance,
-  client,
-};
+export default AuthInstance;

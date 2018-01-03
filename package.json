@@ -7,10 +7,11 @@
     }
   },
   "author": "lucidbyte",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "dist/lucidbyte.js",
   "scripts": {
-    "start:dev": "NODE_ENV=development webpack-dev-server",
+    "start:dev": "NODE_ENV=development webpack-dev-server && npm run watchBuild",
+    "watchBuild": "NODE_ENV=development webpack --watch",
     "dependencyStats": "webpack --profile --json > webpack-stats.json",
     "prepare": "NODE_ENV=production webpack",
     "productionTest": "NODE_ENV=production webpack --watch",

@@ -1,6 +1,8 @@
+import 'regenerator-runtime/runtime';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
 import axios from 'axios';
+import session from './session';
 
 const handlePromiseJSON = res => res.data;
 
@@ -23,7 +25,8 @@ export default ({
   const request = async (
     query,
     variables,
-    queryType = '', // Query | Mutation
+    queryType = '', // Query | Mutation (for non-graphql requests)
+    accessToken = session.get().accessToken
   ) => {
     const isGraphql = !!variables;
     const body = isGraphql
@@ -46,7 +49,7 @@ export default ({
     const response = axios({
       url: constructApiUrl(path, projectID, customOrigin),
       method: 'POST',
-      headers: await constructRequestHeaders(),
+      headers: await constructRequestHeaders(accessToken),
       data: body,
     });
     if (isGraphql) {
@@ -114,18 +117,15 @@ export default ({
         || new Promise((resolve, reject) => {
           promiseResolver = () => {
             request(operations, null, 'Mutation')
-              .then(resolve)
-              .catch(reject);
+              .then(res => {
+                const newRes = Object.create(res);
+                newRes.data = res.data[collection];
+                resolve(newRes);
+              }).catch(reject);
           };
         });
       opTimer = opTimer || setTimeout(flush, batchDelay);
-      return batchPromise.then(res => {
-        const newRes = Object.create(res);
-        newRes.data = res.data[collection];
-        return newRes;
-      }).catch(err => {
-        console.error(err);
-      });
+      return batchPromise;
     }
 
     setMany(query) {

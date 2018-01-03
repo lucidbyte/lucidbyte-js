@@ -4,9 +4,15 @@
 import { h, render, Component } from 'preact';
 import { Main } from '../components/Main';
 import lucidbyte from '../../../index';
+import querystring from 'query-string';
 
-const projectID = '6969e4de-195f-497b-aae6-59fe0e4a8326';
-const origin = 'http://test.lelandkwong.com:3001';
+const defaultProjectID = '6969e4de-195f-497b-aae6-59fe0e4a8326';
+const {
+  origin: customOrigin,
+  projectid: customProjectID
+} = querystring.parse(location.search);
+const origin = customOrigin || 'http://test.lelandkwong.com:3001';
+const projectID = customProjectID || defaultProjectID;
 
 class LoginForm extends Component {
   componentDidMount() {

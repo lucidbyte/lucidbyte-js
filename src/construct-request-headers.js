@@ -1,7 +1,6 @@
 import session from './session';
 
-export default async () => {
-  const accessToken = session.get().accessToken;
+export default async (accessToken) => {
   const headers = {
     // Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
