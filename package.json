@@ -46,6 +46,8 @@
   },
   "dependencies": {
     "axios": "^0.17.1",
+    "basic-browser-request": "^9.0.0",
+    "can-ndjson-stream": "^0.1.7",
     "preact": "^8.2.7",
     "regenerator-runtime": "^0.11.1",
     "shortid": "^2.2.8"

@@ -1,10 +1,12 @@
 import 'regenerator-runtime/runtime';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
-import axios from 'axios';
 import session from './session';
+import ndjsonStream from 'can-ndjson-stream';
 
-const handlePromiseJSON = res => res.data;
+const handlePromiseJSON = res => {
+  return ndjsonStream(res.body);
+};
 
 const handleJSONdata = json => {
   if (json.errors) {
@@ -46,15 +48,32 @@ export default ({
           ? `/api/graphql/${projectID}`
           : `/api/main/${queryType}/${projectID}`
       );
-    const response = axios({
-      url: constructApiUrl(path, projectID, customOrigin),
+    const url = constructApiUrl(path, projectID, customOrigin);
+    const response = fetch(url, {
+      // url: constructApiUrl(path, projectID, customOrigin),
       method: 'POST',
       headers: await constructRequestHeaders(accessToken),
-      data: body,
-    });
+      body: JSON.stringify(body),
+    }).then(handlePromiseJSON)
+      .then(stream => {
+        let read;
+        const reader = stream.getReader();
+        return new Promise((resolve) => {
+          let results;
+          reader.read().then(read = (result) => {
+            const { isStream } = result.value;
+            if (!isStream) {
+              return resolve(result.value);
+            }
+            if (result.done) return resolve(results);
+            results.push(result);
+            // console.log(result);
+            reader.read().then(read);
+          });
+        });
+      });
     if (isGraphql) {
-      return response.then(handlePromiseJSON)
-        .then(handleJSONdata);
+      return response.then(handleJSONdata);
     }
     return response;
   };
@@ -119,7 +138,7 @@ export default ({
             request(operations, null, 'Mutation')
               .then(res => {
                 const newRes = Object.create(res);
-                newRes.data = res.data[collection];
+                newRes.data = res[collection];
                 resolve(newRes);
               }).catch(reject);
           };

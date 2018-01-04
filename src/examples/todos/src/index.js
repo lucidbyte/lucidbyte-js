@@ -41,6 +41,83 @@ const HelloInput = (props) => {
   );
 };
 
+function streamTest() {
+  const makeRequest = require('basic-browser-request');
+
+  let lastReadIndex = 0;
+  let eventCount = 0;
+  let partialChunk = '';
+
+  function isParsableChunk(data) {
+    return data.length &&
+      (data.lastIndexOf('\n') === (data.length - 1));
+  }
+
+  function handleChunk(data) {
+    const ndjsonChunks = data.trim().split('\n');
+    return ndjsonChunks.map(chunk => {
+      return JSON.parse(chunk);
+    });
+  }
+
+  function done(error, response, text) {
+    if (error) {
+      console.log(error);
+    } else if (text) {
+      const isStream = eventCount > 1;
+      if (!isStream) {
+        console.log(
+          JSON.parse(text)
+        );
+        return;
+      }
+      const unreadChunk = text.substr(lastReadIndex).trim();
+      const remainingJson = isParsableChunk(unreadChunk) ? JSON.parse(unreadChunk) : null;
+      console.log('done', remainingJson);
+    } else {
+      console.log('cancelled');
+    }
+  }
+
+  const url = 'http://localhost:3001/api/test/streamable';
+  makeRequest(
+    {
+      url: url,
+      method: 'POST',
+      body: JSON.stringify({
+        length: 100,
+        asStream: 1,
+        rate: 50,
+        batchSize: 10
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      onData: function onData(data) {
+        eventCount++;
+        lastReadIndex += data.length;
+        partialChunk += data;
+        /*
+          Its possible that we get partial json, so we need to check if its valid
+          ndjson by checking for a newline at the end.
+         */
+        const isParsable = isParsableChunk(partialChunk);
+        console.log(
+          isParsable,
+          partialChunk.lastIndexOf('\n'),
+          partialChunk.length - 1
+        );
+        if (isParsable) {
+          const json = handleChunk(partialChunk);
+          console.log(json);
+          partialChunk = '';
+        }
+      }
+    },
+    done
+  );
+}
+
 class HelloWorld extends Component {
   state = {
     loggedIn: false,
@@ -48,6 +125,7 @@ class HelloWorld extends Component {
   }
 
   componentDidMount() {
+    streamTest();
     const config = {
       origin,
       projectID,
@@ -61,23 +139,23 @@ class HelloWorld extends Component {
       this.setState({ loggedIn: state.loggedIn });
 
       if (state.loggedIn) {
-        this.loadMessage();
+        // this.loadMessage();
       }
     });
   }
 
   componentDidUpdate() {
-    this.$collection.get()
-      .then(res => {
-        console.log('new data', res.data);
-      });
+    // this.$collection.get()
+    //   .then(res => {
+    //     console.log('new data', res);
+    //   });
   }
 
   loadMessage = async () => {
-    const { data } = await this.$collection
+    const { items } = await this.$collection
       .filter({ _id: 'testzzbar' })
       .get();
-    const item = data.items[0];
+    const item = items[0];
     if (!item) {
       return;
     }
