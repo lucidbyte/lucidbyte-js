@@ -7,7 +7,7 @@
     }
   },
   "author": "lucidbyte",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "dist/lucidbyte.js",
   "scripts": {
     "start:dev": "NODE_ENV=development webpack-dev-server && npm run watchBuild",
