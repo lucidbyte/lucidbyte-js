@@ -98,7 +98,16 @@ class HelloWorld extends Component {
         }
       })
       .then(res => {
-        console.log(res.data);
+        console.log(res);
+      });
+    this.$collection
+      .filter({ '_id': 'testzzbar123' })
+      // .filter({ 'data.message': prevMessage })
+      .set({
+        // _id: 'testzzbar',
+        data: {
+          message: value
+        }
       });
     this.setState({ message: value });
   }

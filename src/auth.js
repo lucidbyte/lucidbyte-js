@@ -3,9 +3,8 @@ import session from './session';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
 
-const isLoggedIn = () => {
-  return session.exists();
-};
+let hasExpired = false;
+let refreshTokenTimer = null;
 
 // callbacks are global since there should only
 // be one instance of authentication happening at any given time
@@ -49,6 +48,8 @@ const AuthInstance = ({
         email,
         projectID
       })
+    }).catch(err => {
+      console.error(err);
     });
   };
 
@@ -66,41 +67,51 @@ const AuthInstance = ({
         session.set({ accessToken, expiresAt, userId: userID });
         authStateChangeFn(userID);
         return json;
+      }).catch(err => {
+        console.error(err);
       });
   };
 
   const getRefreshToken = async () => {
-    const url = constructApiUrl(`/api/refresh-token/${projectID}`, null, customOrigin);
+    const url = constructApiUrl(`/api/refresh-token`, null, customOrigin);
     return fetch(url, {
       headers: await constructRequestHeaders(),
       method: 'GET',
-    }).then(res => {
-      const { accessToken, expiresAt } = res.data;
-      session.set({ accessToken, expiresAt, userId: session.get().userId });
-      return accessToken;
-    });
+    }).then(res => res.json())
+      .then(res => {
+        const { accessToken, expiresAt } = res;
+        session.set({ accessToken, expiresAt, userId: session.get().userId });
+        return accessToken;
+      }).catch(err => {
+        console.error(err);
+      });
   };
 
-  let hasExpired = false;
-
   const scheduleTokenRefresh = () => {
+    if (refreshTokenTimer) {
+      return;
+    }
     const { expiresAt } = session.get();
-    const padding = 1000 * 60 * 60;
-    const delay =  expiresAt - new Date().getTime() - padding;
+    const leeway = 1000 * 60 * 60 * 6; // 3 hours leeway
+    const delay =  expiresAt - new Date().getTime() - leeway;
     hasExpired = delay <= 0;
     if (!hasExpired) {
-      setTimeout(() => {
+      refreshTokenTimer = setTimeout(() => {
         getRefreshToken()
           .then(scheduleTokenRefresh);
+        refreshTokenTimer = null;
       }, delay);
     } else {
       logout();
     }
   };
 
-  if (isLoggedIn()) {
-    scheduleTokenRefresh();
-  }
+  onAuthStateChange(({ loggedIn }) => {
+    if (loggedIn) {
+      scheduleTokenRefresh();
+    }
+  });
+
 
   return {
     getAccessToken,
