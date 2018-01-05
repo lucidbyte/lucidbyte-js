@@ -17,7 +17,8 @@ module.exports = {
   devtool: isDev ? 'cheap-module-eval-source-map' : false,
   devServer: {
     compress: true,
-    port: 3003
+    port: 3003,
+    host: '0.0.0.0'
   },
   module: {
     rules: [

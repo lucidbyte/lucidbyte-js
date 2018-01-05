@@ -35,44 +35,19 @@ class LoginForm extends Component {
   }
 }
 
-const HelloInput = (props) => {
+const HelloInput = ({ style = {}, ...props }) => {
   return (
-    <input {...props} />
+    <textarea
+      style={{
+        ...style,
+        width: '100%',
+        maxWidth: '100%',
+        minHeight: '10em'
+      }}
+      {...props}
+    />
   );
 };
-
-function streamTest() {
-  const requestStream = require('../../../stream').default;
-  const url = 'http://localhost:3001/api/test/streamable';
-  const options = {
-    url: url,
-    method: 'POST',
-    body: JSON.stringify({
-      length: 20,
-      asStream: 1,
-      rate: 25,
-      batchSize: 3
-    }),
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  };
-
-  new Promise((resolve, reject) => {
-    requestStream({
-      options,
-      onError: reject,
-      onComplete: resolve,
-      onData(data) {
-        console.log(['onData'], data);
-      }
-    });
-  }).then(res => {
-    console.log(['done'], res);
-  }).catch(err => {
-    console.error(['error'], err);
-  });
-}
 
 class HelloWorld extends Component {
   state = {
@@ -81,7 +56,7 @@ class HelloWorld extends Component {
   }
 
   componentDidMount() {
-    streamTest();
+    // streamTest();
 
     const config = {
       origin,
@@ -96,20 +71,27 @@ class HelloWorld extends Component {
       this.setState({ loggedIn: state.loggedIn });
 
       if (state.loggedIn) {
-        // this.loadMessage();
+        this.loadMessage();
       }
     });
   }
 
   componentDidUpdate() {
-    // this.$collection.get()
-    //   .then(res => {
-    //     console.log('new data', res);
-    //   });
+    this.$collection.get(
+      null,
+      function forEach(item) {
+        console.log({
+          time: performance.now(),
+          item
+        });
+      }
+    ).then(res => {
+      // console.log('new data', res);
+    });
   }
 
   loadMessage = async () => {
-    const { items } = await this.$collection
+    const items = await this.$collection
       .filter({ _id: 'testzzbar' })
       .get();
     const item = items[0];
@@ -133,7 +115,7 @@ class HelloWorld extends Component {
         }
       })
       .then(res => {
-        console.log(res);
+        // console.log(res);
       });
     this.$collection
       .filter({ '_id': 'testzzbar123' })

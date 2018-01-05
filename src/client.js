@@ -2,6 +2,7 @@ import 'regenerator-runtime/runtime';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
 import session from './session';
+import crossStream from './stream';
 
 const handlePromiseJSON = res => {
   return res.json();
@@ -16,6 +17,15 @@ const handleJSONdata = json => {
 
 const maxContentSize = 1024 * 1000; // 1mb
 
+const flattenStreamResults = (results) => {
+  if (!Array.isArray(results[0])) {
+    return results;
+  }
+  return results.reduce((a, b) => a.concat(b), []);
+};
+
+const noop = () => {};
+
 export default ({
   projectID,
   dev = false,
@@ -27,7 +37,7 @@ export default ({
     query,
     variables,
     queryType = '', // Query | Mutation (for non-graphql requests)
-    accessToken = session.get().accessToken
+    forEach
   ) => {
     const isGraphql = !!variables;
     const body = isGraphql
@@ -47,17 +57,36 @@ export default ({
           ? `/api/graphql/${projectID}`
           : `/api/main/${queryType}/${projectID}`
       );
+    const accessToken = session.get().accessToken;
     const url = constructApiUrl(path, projectID, customOrigin);
-    const response = fetch(url, {
-      // url: constructApiUrl(path, projectID, customOrigin),
+    const config = {
       method: 'POST',
       headers: await constructRequestHeaders(accessToken),
       body: JSON.stringify(body),
-    }).then(handlePromiseJSON);
+    };
     if (isGraphql) {
+      const response = fetch(url, config).then(handlePromiseJSON);
       return response.then(handleJSONdata);
     }
-    return response;
+    return new Promise((resolve, reject) => {
+      const options = Object.create(config);
+      options.url = url;
+      const onComplete = (results) => resolve(flattenStreamResults(results));
+      const onData = forEach
+        ? (data) => {
+          if (Array.isArray(data)) {
+            return data.forEach(forEach);
+          }
+          forEach(data);
+        }
+        : noop;
+      crossStream({
+        options,
+        onError: reject,
+        onComplete,
+        onData
+      });
+    });
   };
   let operations = {};
   let opResponse;
@@ -133,10 +162,11 @@ export default ({
       return this.set(query, null, 3);
     }
 
-    get(query = {}) {
-      query.filter = this._filter;
-      query.collection = this.collection;
-      return request(query, null, 'Query');
+    get(query, forEach) {
+      const normalizedQuery = query || {};
+      normalizedQuery.filter = this._filter;
+      normalizedQuery.collection = this.collection;
+      return request(normalizedQuery, null, 'Query', forEach);
     }
 
     delete() {

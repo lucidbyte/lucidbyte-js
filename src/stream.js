@@ -16,7 +16,10 @@ function handleNdjsonChunk(data) {
 
 function emitData(parsedChunks) {
   const { originalOnData } = this;
-  const { parsedChunks: parsedChunksState, hasOnComplete } = this[STATE];
+  const {
+    parsedChunks: parsedChunksState,
+    hasOnComplete,
+  } = this[STATE];
   // emit the data once per ndjson chunk
   for (let i = 0; i < parsedChunks.length; i++) {
     const chunk = parsedChunks[i];
@@ -34,8 +37,7 @@ function handleChunk(data) {
     Its possible that we get partial json, so we need to check if its valid
     ndjson by checking for a newline at the end.
    */
-  const isParsableNdjson = isNdjson(pChunk);
-  if (isParsableNdjson) {
+  if (isNdjson(pChunk)) {
     const parsedChunks = handleNdjsonChunk(pChunk);
     emitData.call(this, parsedChunks);
     _s.lastParsedIndex += pChunk.length;
@@ -117,13 +119,16 @@ export default function crossStream(config) {
       onComplete(_s.parsedChunks);
     // handle remainingChunk
     } else {
-      const parsedChunks = isNdjson(remainingChunk)
+      const isNdjsonResponse = isNdjson(text);
+      const finalChunk = isNdjsonResponse
         ? handleNdjsonChunk(remainingChunk)
         : JSON.parse(remainingChunk);
 
       // emit remaining data objects
-      emitData.call(opts, parsedChunks);
-      onComplete(_s.parsedChunks);
+      emitData.call(opts, finalChunk);
+      onComplete(
+        isNdjsonResponse ? _s.parsedChunks : finalChunk
+      );
     }
   }
 
