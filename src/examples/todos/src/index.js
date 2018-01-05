@@ -42,110 +42,34 @@ const HelloInput = (props) => {
 };
 
 function streamTest() {
-  const makeRequest = require('basic-browser-request');
-
-  let lastReadIndex = 0;
-  let eventCount = 0;
-  let partialChunk = '';
-  const parsedChunks = [];
-
-  function isNdjson(data) {
-    return data.length &&
-      (data.lastIndexOf('\n') === (data.length - 1));
-  }
-
-  function handleNdjsonChunk(data) {
-    const ndjsonChunks = data.trim().split('\n');
-    return ndjsonChunks.map(chunk => {
-      return JSON.parse(chunk);
-    });
-  }
-
-  function flattenChunks(parsedChunks) {
-    return parsedChunks.reduce((a, b) => a.concat(b), []);
-  }
-
+  const requestStream = require('./stream').default;
   const url = 'http://localhost:3001/api/test/streamable';
-  const noop = () => {};
-
-  const requestStream = function(
-    reject, // called on xhr error
-    resolve, // called with final parsed JSON payload
-    onData = noop // called on each xhr statechange
-  ) {
-    function done(error, response, text) {
-      if (error) {
-        reject(error);
-      } else if (text) {
-        const isStream = eventCount > 1;
-        // send parsed payload
-        if (!isStream) {
-          return resolve(flattenChunks(parsedChunks));
-        }
-        const unreadChunk = text.substr(lastReadIndex);
-        if (!unreadChunk.length) {
-          return resolve(flattenChunks(parsedChunks));
-        }
-        const json = isNdjson(unreadChunk)
-          ? handleNdjsonChunk(unreadChunk)
-          : JSON.parse(unreadChunk);
-        // send one last `onData` event
-        onData(json);
-        parsedChunks.push(json);
-        // send final payload
-        resolve(flattenChunks(parsedChunks));
-      } else {
-        resolve({ cancelled: true });
-        console.log('cancelled');
-      }
+  const options = {
+    url: url,
+    method: 'POST',
+    body: JSON.stringify({
+      length: 10,
+      asStream: 1,
+      rate: 15,
+      batchSize: 2
+    }),
+    headers: {
+      'Content-Type': 'application/json'
     }
-
-    makeRequest(
-      {
-        url: url,
-        method: 'POST',
-        body: JSON.stringify({
-          length: 100,
-          asStream: 1,
-          rate: 50,
-          batchSize: 12
-        }),
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        onData: function(data) {
-          eventCount++;
-          lastReadIndex += data.length;
-          partialChunk += data;
-          /*
-            Its possible that we get partial json, so we need to check if its valid
-            ndjson by checking for a newline at the end.
-           */
-          const isParsable = isNdjson(partialChunk);
-          if (isParsable) {
-            const json = handleNdjsonChunk(partialChunk);
-            parsedChunks.push(json);
-            onData(json);
-            // console.log(json);
-            partialChunk = '';
-          }
-        }
-      },
-      done
-    );
   };
 
-  requestStream(
-    function error(err) {
+  requestStream({
+    options,
+    onError(err) {
       console.log(['error'], err);
     },
-    function done(res) {
+    onComplete(res) {
       console.log(['done'], res);
     },
-    function onData(data) {
+    onData(data) {
       console.log(['onData'], data);
     }
-  );
+  });
 }
 
 class HelloWorld extends Component {
@@ -156,6 +80,7 @@ class HelloWorld extends Component {
 
   componentDidMount() {
     streamTest();
+
     const config = {
       origin,
       projectID,
