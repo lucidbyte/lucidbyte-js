@@ -42,33 +42,35 @@ const HelloInput = (props) => {
 };
 
 function streamTest() {
-  const requestStream = require('./stream').default;
+  const requestStream = require('../../../stream').default;
   const url = 'http://localhost:3001/api/test/streamable';
   const options = {
     url: url,
     method: 'POST',
     body: JSON.stringify({
-      length: 10,
+      length: 20,
       asStream: 1,
-      rate: 15,
-      batchSize: 2
+      rate: 25,
+      batchSize: 3
     }),
     headers: {
       'Content-Type': 'application/json'
     }
   };
 
-  requestStream({
-    options,
-    onError(err) {
-      console.log(['error'], err);
-    },
-    onComplete(res) {
-      console.log(['done'], res);
-    },
-    onData(data) {
-      console.log(['onData'], data);
-    }
+  new Promise((resolve, reject) => {
+    requestStream({
+      options,
+      onError: reject,
+      onComplete: resolve,
+      onData(data) {
+        console.log(['onData'], data);
+      }
+    });
+  }).then(res => {
+    console.log(['done'], res);
+  }).catch(err => {
+    console.error(['error'], err);
   });
 }
 

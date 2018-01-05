@@ -2,10 +2,9 @@ import 'regenerator-runtime/runtime';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
 import session from './session';
-import ndjsonStream from 'can-ndjson-stream';
 
 const handlePromiseJSON = res => {
-  return ndjsonStream(res.body);
+  return res.json();
 };
 
 const handleJSONdata = json => {
@@ -54,24 +53,7 @@ export default ({
       method: 'POST',
       headers: await constructRequestHeaders(accessToken),
       body: JSON.stringify(body),
-    }).then(handlePromiseJSON)
-      .then(stream => {
-        let read;
-        const reader = stream.getReader();
-        return new Promise((resolve) => {
-          let results;
-          reader.read().then(read = (result) => {
-            const { isStream } = result.value;
-            if (!isStream) {
-              return resolve(result.value);
-            }
-            if (result.done) return resolve(results);
-            results.push(result);
-            // console.log(result);
-            reader.read().then(read);
-          });
-        });
-      });
+    }).then(handlePromiseJSON);
     if (isGraphql) {
       return response.then(handleJSONdata);
     }

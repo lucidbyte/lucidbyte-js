@@ -38,6 +38,8 @@
     "eslint-plugin-react": "^7.1.0",
     "eslint-plugin-standard": "^3.0.1",
     "http-server": "^0.10.0",
+    "jest": "^22.0.4",
+    "jest-cli": "^22.0.4",
     "query-string": "^5.0.1",
     "shortid": "^2.2.8",
     "uglifyjs-webpack-plugin": "^1.1.4",
