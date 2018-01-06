@@ -11,7 +11,7 @@ const {
   origin: customOrigin,
   projectid: customProjectID
 } = querystring.parse(location.search);
-const origin = customOrigin || 'http://test.lelandkwong.com:3001';
+const origin = customOrigin || 'https://localhost:3001';
 const projectID = customProjectID || defaultProjectID;
 
 class LoginForm extends Component {

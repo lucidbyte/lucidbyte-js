@@ -10,7 +10,7 @@ export const project = '60d1e385-e710-46e7-b4d4-507741622bdb';
 // remote project
 // export const project = '722fd47f-fe5c-4d9f-ab42-0f1f9c947fb7';
 const config = {
-  origin: 'http://test.lelandkwong.com:3001',
+  origin: 'https://localhost:3001',
   projectID: project
 };
 const client = lucidbyte.client(config);

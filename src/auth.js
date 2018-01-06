@@ -81,6 +81,7 @@ const AuthInstance = ({
       .then(res => {
         const { accessToken, expiresAt } = res;
         session.set({ accessToken, expiresAt, userId: session.get().userId });
+        console.log(`token refreshed`);
         return accessToken;
       }).catch(err => {
         console.error(err);
@@ -91,9 +92,7 @@ const AuthInstance = ({
     if (refreshTokenTimer) {
       return;
     }
-    const { expiresAt } = session.get();
-    const leeway = 1000 * 60 * 60 * 6; // 3 hours leeway
-    const delay =  expiresAt - new Date().getTime() - leeway;
+    const delay =  1000 * 60 * 60 * 2; // refresh every 2 hours
     hasExpired = delay <= 0;
     if (!hasExpired) {
       refreshTokenTimer = setTimeout(() => {
