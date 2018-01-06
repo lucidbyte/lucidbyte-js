@@ -81,7 +81,6 @@ const AuthInstance = ({
       .then(res => {
         const { accessToken, expiresAt } = res;
         session.set({ accessToken, expiresAt, userId: session.get().userId });
-        console.log(`token refreshed`);
         return accessToken;
       }).catch(err => {
         console.error(err);
