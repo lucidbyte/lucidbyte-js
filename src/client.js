@@ -15,7 +15,9 @@ const handleJSONdata = json => {
   return json.data;
 };
 
-const maxContentSize = 1024 * 1000; // 1mb
+// limits
+const maxContentSize = 1024 * 5000; // 5mb
+const maxOpsPerRequest = 500;
 
 const flattenStreamResults = (results) => {
   if (!Array.isArray(results[0])) {
@@ -25,6 +27,16 @@ const flattenStreamResults = (results) => {
 };
 
 const noop = () => {};
+
+function filter(filter) {
+  const props = {
+    _filter: {
+      writable: false,
+      value: filter
+    }
+  };
+  return Object.create(this, props);
+}
 
 export default ({
   projectID,
@@ -117,6 +129,13 @@ export default ({
     }
 
     set(query, options, methodType = 0) {
+      const { collection } = this;
+      const opsList = operations[collection] = operations[collection] || [];
+
+      if (opsList.length === maxOpsPerRequest) {
+        flush();
+      }
+
       const { _filter: filter } = this;
       const op = query
         ? [methodType, filter, query]
@@ -140,51 +159,33 @@ export default ({
         totalRequestContent += payloadString;
       }
 
-      const { collection } = this;
-      const opsList = operations[collection] = operations[collection] || [];
       opsList.push(op);
-      const batchPromise = opResponse = opResponse
-        || new Promise((resolve, reject) => {
-          promiseResolver = () => {
-            request(operations, null, 'Mutation')
-              .then(res => {
-                const newRes = Object.create(res);
-                newRes.data = res[collection];
-                resolve(newRes);
-              }).catch(reject);
-          };
-        });
+      opResponse = opResponse || new Promise((resolve, reject) => {
+        promiseResolver = () => {
+          request(operations, null, 'Mutation')
+            .then(resolve)
+            .catch(reject);
+        };
+      });
       opTimer = opTimer || setTimeout(flush, batchDelay);
-      return batchPromise;
+      return opResponse.then(res => {
+        return res[collection];
+      });
     }
 
-    setMany(query) {
-      return this.set(query, null, 3);
-    }
-
-    get(query, forEach) {
-      const normalizedQuery = query || {};
-      normalizedQuery.filter = this._filter;
-      normalizedQuery.collection = this.collection;
-      return request(normalizedQuery, null, 'Query', forEach);
+    get(filter, opts, forEach) {
+      const options = opts || {};
+      options.filter = filter || {};
+      options.collection = this.collection;
+      return request(options, null, 'Query', forEach);
     }
 
     delete() {
       return this.set(null, null, 1);
     }
 
-    deleteMany() {
-      return this.set(null, null, 2);
-    }
-
-    filter(filter) {
-      const props = {
-        _filter: {
-          writable: false,
-          value: filter
-        }
-      };
-      return Object.create(this, props);
+    id(_id) {
+      return filter.call(this, { _id });
     }
   }
 
@@ -193,7 +194,6 @@ export default ({
   };
 
   request.flush = flush;
-  request.dev = dev;
 
   return request;
 };
