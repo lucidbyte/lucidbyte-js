@@ -10,19 +10,19 @@ let refreshTokenTimer = null;
 // be one instance of authentication happening at any given time
 const authStateChangeCallbacks = [];
 
-const authStateObject = (userID) => ({
-  loggedIn: session.exists(),
-  userId: userID || null
+const authStateObject = () => ({
+  loggedIn: !session.isExpired(),
+  userId: session.get().userId || null
 });
 
-const authStateChangeFn = (userID) => {
+const authStateChangeFn = () => {
   authStateChangeCallbacks
-    .forEach(cb => cb(authStateObject(userID)));
+    .forEach(cb => cb(authStateObject()));
 };
 const onAuthStateChange = (callback) => {
   authStateChangeCallbacks.push(callback);
   // call the callback immediately the first time
-  callback(authStateObject(session.get().userId));
+  callback(authStateObject());
 };
 
 const logout = () => {
@@ -84,32 +84,34 @@ const AuthInstance = ({
       .then(res => {
         const { accessToken, expiresAt } = res;
         session.set({ accessToken, expiresAt, userId: session.get().userId });
-        return accessToken;
+        return res;
       }).catch(err => {
         console.error(err);
       });
   };
 
-  const scheduleTokenRefresh = () => {
+  const scheduleTokenRefresh = ({ expiresAt }) => {
     if (refreshTokenTimer) {
       return;
     }
-    const delay =  1000 * 60 * 60 * 2; // refresh every 2 hours
+    const refreshRate =  1000 * 60 * 60 * 2; // refresh every 2 hours
+    const expiresIn = expiresAt - new Date().getTime();
+    const delay = expiresIn < refreshRate ? 0 : refreshRate;
     hasExpired = delay <= 0;
     if (!hasExpired) {
       refreshTokenTimer = setTimeout(() => {
         getRefreshToken()
           .then(scheduleTokenRefresh);
-        refreshTokenTimer = null;
       }, delay);
     } else {
+      refreshTokenTimer = null;
       logout();
     }
   };
 
   onAuthStateChange(({ loggedIn }) => {
     if (loggedIn) {
-      scheduleTokenRefresh();
+      scheduleTokenRefresh({ expiresAt: session.get().expiresAt });
     }
   });
 

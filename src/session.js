@@ -1,24 +1,30 @@
-const session = (
-  method,
-  sessionParams = {}
-) => {
-  const {
-    accessToken,
-    expiresAt,
-    userId
-  } = sessionParams;
-  return {
-    accessToken: localStorage[`${method}Item`]('accessToken', accessToken),
-    expiresAt: localStorage[`${method}Item`]('expiresAt', expiresAt),
-    userId: localStorage[`${method}Item`]('userId', userId),
-  };
-};
+const ns = 'lucidbyte';
 
-Object.assign(session, {
-  get: () => session('get'),
-  end: () => session('remove'),
-  set: (sessionParams) => session('set', sessionParams),
-  exists: () => !!session('get').accessToken,
-});
+const session = {
+  set(sessionParams = {
+    accessToken: '', expiresAt: 0, userId: ''
+  }) {
+    const session = JSON.stringify(sessionParams);
+    localStorage.setItem(ns, session);
+    return sessionParams;
+  },
+  get() {
+    try {
+      return JSON.parse(localStorage.getItem(ns)) || {};
+    } catch(err) {
+      return {};
+    }
+  },
+  remove() {
+    localStorage.removeItem(ns);
+  },
+  end: () => session.remove(),
+  exists: () => !!session.get().accessToken,
+  isExpired: () => (
+    session.exists()
+      ? session.get().expiresAt - new Date().getTime() < 0
+      : true
+  )
+};
 
 export default session;

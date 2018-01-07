@@ -48,14 +48,19 @@ class Input extends Component {
   }
 }
 
-const EmailPrompt = ({ onSubmit, onInput, value }) => (
+const EmailPrompt = ({ onSubmit, onInput, value, sendInProgress }) => (
   <form className='Login__EmailForm' onSubmit={onSubmit}>
     <h2 className='Login__EmailTitle'>Authenticate</h2>
-    <p>To sign up or log in, fill in your email address below:</p>
+    {!sendInProgress
+      ? <p>To sign up or log in, fill in your email address below:</p>
+      : <p>Sending you an email code...</p>
+    }
     <Input
       className='Login__EmailInput'
       type='email'
       autoComplete='email'
+      disabled={sendInProgress}
+      style={{ opacity: sendInProgress ? 0.5 : 1 }}
       autofocus={true}
       autofocusOnWindowFocus={true}
       placeholder='your_email@domain.com'
@@ -80,10 +85,10 @@ const AwaitingConfirmation = ({ onSubmit, onInput, onUndo, value, email, error }
         <Input
           className='Login__CodeInput'
           autofocus={true}
+          autofocusOnWindowFocus={true}
           type='text'
           placeholder='enter code here'
           value={value}
-          autofocusOnWindowFocus={true}
           onInput={onInput}
         />
       </form>
@@ -97,10 +102,72 @@ const AwaitingConfirmation = ({ onSubmit, onInput, onUndo, value, email, error }
 const initialState = () => ({
   email: '',
   emailSent: false,
+  emailSendInProgress: false,
 
   code: '',
   codeError: ''
 });
+
+const Style = () =>
+  <style>{/* @css */`
+    .Login {
+      text-align: center;
+      max-width: 33rem;
+      margin: 0 auto;
+    }
+
+    .Login * {
+      box-sizing: border-box;
+    }
+
+    .Login input {
+      text-align: inherit;
+      line-height: 2.2;
+      font-family: inherit;
+      font-size: inherit;
+      width: 100%;
+      border: 1px solid #d2d0d0;
+      box-shadow: inset 0px 1px 1px rgba(0,0,0,.1);
+    }
+
+    .Login input:focus {
+      border-color: rgb(1, 93, 201);
+      outline: none;
+    }
+
+    .Login h2 {
+      font-weight: bold;
+      font-size: 1.3rem;
+      margin-bottom: 1.2em;
+    }
+
+    .Login__Error {
+      background: rgb(204, 55, 53);
+      color: #fff;
+      padding: .4em;
+    }
+
+    @keyframes pulseCodeWaitingMessage {
+      0% {
+        opacity: 0;
+      }
+
+      50% {
+        opacity: 1;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    .Login__CodeWaitingMessage {
+      font-size: .9em;
+      opacity: 0;
+      margin-top: 1em;
+      animation: pulseCodeWaitingMessage 5s 2s infinite;
+    }
+  `}</style>;
 
 export default class LoginForm extends Component {
   state = initialState()
@@ -118,12 +185,18 @@ export default class LoginForm extends Component {
   handleSubmit = (ev) => {
     ev.preventDefault();
     const { email } = this.state;
-    this.login(email).then(res => {
-      console.log(res);
+    this.login(email).then(() => {
+      this.sendInProgressState(false);
       this.setState({ emailSent: true });
     }).catch(err => {
       console.error(err);
+      this.sendInProgressState(false);
     });
+    this.sendInProgressState(true);
+  }
+
+  sendInProgressState(inProgress) {
+    this.setState({ emailSendInProgress: inProgress });
   }
 
   handleEmailChange = (ev) => {
@@ -160,83 +233,14 @@ export default class LoginForm extends Component {
     }
     return (
       <div className='Login'>
-        <style>{/* @css */`
-          @keyframes showLogin__CodeLabel {
-            from {
-              opacity: 0;
-              transform: scale(.2, .2);
-              transform-origin: center;
-            }
-          }
-
-          .Login__CodeLabel {
-            animation: showLogin__CodeLabel .3s 1;
-          }
-
-          .Login {
-            text-align: center;
-            max-width: 33rem;
-            margin: 0 auto;
-          }
-
-          .Login * {
-            box-sizing: border-box;
-          }
-
-          .Login input {
-            text-align: inherit;
-            line-height: 2.2;
-            font-family: inherit;
-            font-size: inherit;
-            width: 100%;
-            border: 1px solid #d2d0d0;
-            box-shadow: inset 0px 1px 1px rgba(0,0,0,.1);
-          }
-
-          .Login input:focus {
-            border-color: rgb(1, 93, 201);
-            outline: none;
-          }
-
-          .Login h2 {
-            font-weight: bold;
-            font-size: 1.3rem;
-            margin-bottom: 1.2em;
-          }
-
-          .Login__Error {
-            background: rgb(204, 55, 53);
-            color: #fff;
-            padding: .4em;
-          }
-
-          @keyframes pulseCodeWaitingMessage {
-            0% {
-              opacity: 0;
-            }
-
-            50% {
-              opacity: 1;
-            }
-
-            100% {
-              opacity: 0;
-            }
-          }
-
-          .Login__CodeWaitingMessage {
-            font-size: .9em;
-            opacity: 0;
-            margin-top: 1em;
-            animation: pulseCodeWaitingMessage 5s 2s infinite;
-          }
-        `}</style>
+        {!props.customStyle && <Style />}
         {!state.emailSent
           ? (
             <EmailPrompt
               onInput={this.handleEmailChange}
               onSubmit={this.handleSubmit}
               value={state.email}
+              sendInProgress={state.emailSendInProgress}
             />
           ) : (
             <AwaitingConfirmation
@@ -258,6 +262,7 @@ LoginForm.render = ({
   projectID,
   origin,
   element,
+  customStyle = false,
   unmounted = false
 }) => {
   render(
@@ -265,6 +270,7 @@ LoginForm.render = ({
       projectID={projectID}
       customOrigin={origin}
       unmounted={unmounted}
+      customStyle={customStyle}
     />,
     element
   );
