@@ -94,9 +94,11 @@ export default function crossStream(config) {
     onData
   } = config;
 
-  const missingCallbackError = missingRequiredCallback(onError, onData, onComplete);
-  if (missingCallbackError) {
-    throw missingCallbackError;
+  if (process.env.NODE_ENV === 'development') {
+    const missingCallbackError = missingRequiredCallback(onError, onData, onComplete);
+    if (missingCallbackError) {
+      throw missingCallbackError;
+    }
   }
 
   const opts = Options(options, onData, onComplete !== noop);

@@ -1,79 +1,6 @@
-import 'regenerator-runtime/runtime';
-import constructApiUrl from './construct-api-url';
-import constructRequestHeaders from './construct-request-headers';
-import session from './session';
-import crossStream from './stream';
+import request from './request';
 
-const flattenArrays = (a, b) => a.concat(b);
-const flattenStreamResults = (results) => {
-  const isFromStream = Array.isArray(results[0]);
-  return isFromStream
-    ? results.reduce(flattenArrays, [])
-    : results;
-};
-
-const noop = () => {};
-
-const HttpConfig = (body, accessToken) => ({
-  method: 'POST',
-  headers: constructRequestHeaders(accessToken),
-  body: JSON.stringify(body)
-});
-
-export const request = async (
-  query,
-  variables,
-  queryType = '', // Query | Mutation (for non-graphql requests)
-  forEach,
-  config = {},
-  customRequest,
-) => {
-  const {
-    projectID,
-    dev = false,
-    // the following props are only for testing purposes
-    origin: customOrigin,
-    path: customPath
-  } = config;
-
-  const accessToken = session.get().accessToken;
-
-  if (customRequest) {
-    const body = { query, variables };
-    const httpConfig = HttpConfig(body, accessToken);
-    const url = constructApiUrl(customPath, projectID, customOrigin);
-    return customRequest({ url, httpConfig });
-  }
-
-  const path = customPath || `/api/main/${queryType}/${projectID}`;
-  const url = constructApiUrl(path, projectID, customOrigin);
-  const body = {
-    payload: query,
-  };
-  if (dev) {
-    body.dev = 1;
-  }
-  const httpConfig = HttpConfig(body, accessToken);
-  return new Promise((resolve, reject) => {
-    const options = Object.create(httpConfig);
-    options.url = url;
-    const onComplete = (results) => resolve(flattenStreamResults(results));
-    const onData = forEach
-      ? (data) => {
-        if (Array.isArray(data)) {
-          return data.forEach(forEach);
-        }
-        forEach(data);
-      }
-      : noop;
-    crossStream({
-      options,
-      onError: reject,
-      onComplete,
-      onData
-    });
-  });
-};
+const docUrl = (hash) => `https://test.remote.lelandkwong.com/docs#${hash}`;
 
 const methodTypes = {
   update: 0,
@@ -85,8 +12,7 @@ const maxContentSize = 1024 * 5000; // 5mb
 const maxOpsPerRequest = 500;
 
 export default (requestConfig) => {
-  const { dev } = requestConfig;
-
+  // batch scope
   let operations = {};
   let opResponse;
   let opTimer;
@@ -113,10 +39,9 @@ export default (requestConfig) => {
   class Methods {
     constructor(collection) {
       this.collection = collection;
-      this._filter = {};
     }
 
-    set(_id, query, options, methodType = methodTypes.update) {
+    set(_id, documentObject, options, methodType = methodTypes.update) {
       const { collection } = this;
       const opsList = operations[collection] = operations[collection] || [];
 
@@ -125,7 +50,7 @@ export default (requestConfig) => {
         flush();
       }
 
-      const { _filter: filter } = this;
+      const filter = {};
       if (
         typeof _id !== 'undefined'
         && _id !== null
@@ -133,14 +58,14 @@ export default (requestConfig) => {
         filter._id = _id;
       }
 
-      const op = query
-        ? [methodType, filter, query]
+      const op = documentObject
+        ? [methodType, filter, documentObject]
         : [methodType, filter];
       if (options) {
         op.push(options);
       }
 
-      if (dev) {
+      if (process.env.NODE_ENV === 'development') {
         const payloadString = JSON.stringify(op);
         const batchSizeTooLarge = totalRequestContent.length + payloadString.length >= maxContentSize;
         if (batchSizeTooLarge) {
@@ -173,15 +98,29 @@ export default (requestConfig) => {
       return this.set(_id, { $set: value }, options);
     }
 
-    get(filter, opts, forEach) {
-      const options = opts || {};
-      options.filter = filter || {};
-      options.collection = this.collection;
-      return request(options, null, 'Query', forEach, requestConfig);
+    get(_id, opts) {
+      if (process.env.NODE_ENV === 'development') {
+        const isMissingId = typeof _id === 'undefined' || _id === null;
+        if (isMissingId) {
+          const error = `missing \`_id\` argument in \`get\` method.
+  ${docUrl('get')}`;
+          throw(error);
+        }
+      }
+      return this.query({ _id }, opts);
     }
 
     delete(_id) {
       return this.set(_id, null, null, methodTypes.delete);
+    }
+
+    query(filter, options, forEach) {
+      const query = [
+        this.collection,
+        filter || {},
+        options || {},
+      ];
+      return request(query, null, 'Query', forEach, requestConfig);
     }
   }
 

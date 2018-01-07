@@ -41,7 +41,6 @@
     "jest": "^22.0.4",
     "jest-cli": "^22.0.4",
     "query-string": "^5.0.1",
-    "shortid": "^2.2.8",
     "uglifyjs-webpack-plugin": "^1.1.4",
     "webpack": "^3.10.0",
     "webpack-dev-server": "^2.9.7"
@@ -49,8 +48,7 @@
   "dependencies": {
     "basic-browser-request": "^9.0.0",
     "preact": "^8.2.7",
-    "regenerator-runtime": "^0.11.1",
-    "shortid": "^2.2.8"
+    "regenerator-runtime": "^0.11.1"
   },
   "description": "sdk for lucidbyte frontend database",
   "directories": {

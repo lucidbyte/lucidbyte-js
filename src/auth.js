@@ -1,4 +1,3 @@
-import 'regenerator-runtime/runtime';
 import session from './session';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
@@ -40,7 +39,7 @@ const AuthInstance = ({
     return {};
   }
 
-  const login = async (email) => {
+  const login = (email) => {
     const url = constructApiUrl(`/api/login`, projectID, customOrigin);
     return fetch(url, {
       method: 'POST',
@@ -75,10 +74,10 @@ const AuthInstance = ({
       });
   };
 
-  const getRefreshToken = async () => {
+  const getRefreshToken = () => {
     const url = constructApiUrl(`/api/refresh-token`, null, customOrigin);
     return fetch(url, {
-      headers: await constructRequestHeaders(),
+      headers: constructRequestHeaders(),
       method: 'GET',
     }).then(res => res.json())
       .then(res => {

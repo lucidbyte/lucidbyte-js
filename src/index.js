@@ -1,6 +1,6 @@
 export default {
   auth: require('./auth').default,
-  request: require('./client').request,
+  request: require('./request').default,
   client: require('./client').default,
   LoginForm: require('./LoginForm').default
 };
