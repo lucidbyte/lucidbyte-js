@@ -10,16 +10,19 @@ let refreshTokenTimer = null;
 // be one instance of authentication happening at any given time
 const authStateChangeCallbacks = [];
 
+const authStateObject = (userID) => ({
+  loggedIn: session.exists(),
+  userId: userID || null
+});
+
 const authStateChangeFn = (userID) => {
   authStateChangeCallbacks
-    .forEach(cb => cb({
-      loggedIn: session.exists(),
-      userId: userID || null
-    }));
+    .forEach(cb => cb(authStateObject(userID)));
 };
 const onAuthStateChange = (callback) => {
   authStateChangeCallbacks.push(callback);
-  authStateChangeFn(session.get().userId);
+  // call the callback immediately the first time
+  callback(authStateObject(session.get().userId));
 };
 
 const logout = () => {

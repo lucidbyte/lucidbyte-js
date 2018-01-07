@@ -4,102 +4,89 @@ import constructRequestHeaders from './construct-request-headers';
 import session from './session';
 import crossStream from './stream';
 
-const handlePromiseJSON = res => {
-  return res.json();
+const flattenArrays = (a, b) => a.concat(b);
+const flattenStreamResults = (results) => {
+  const isFromStream = Array.isArray(results[0]);
+  return isFromStream
+    ? results.reduce(flattenArrays, [])
+    : results;
 };
 
-const handleJSONdata = json => {
-  if (json.errors) {
-    console.error('graphqlError: \n' + JSON.stringify(json.errors, null, 2));
+const noop = () => {};
+
+const HttpConfig = (body, accessToken) => ({
+  method: 'POST',
+  headers: constructRequestHeaders(accessToken),
+  body: JSON.stringify(body)
+});
+
+export const request = async (
+  query,
+  variables,
+  queryType = '', // Query | Mutation (for non-graphql requests)
+  forEach,
+  config = {},
+  customRequest,
+) => {
+  const {
+    projectID,
+    dev = false,
+    // the following props are only for testing purposes
+    origin: customOrigin,
+    path: customPath
+  } = config;
+
+  const accessToken = session.get().accessToken;
+
+  if (customRequest) {
+    const body = { query, variables };
+    const httpConfig = HttpConfig(body, accessToken);
+    const url = constructApiUrl(customPath, projectID, customOrigin);
+    return customRequest({ url, httpConfig });
   }
-  return json.data;
+
+  const path = customPath || `/api/main/${queryType}/${projectID}`;
+  const url = constructApiUrl(path, projectID, customOrigin);
+  const body = {
+    payload: query,
+  };
+  if (dev) {
+    body.dev = 1;
+  }
+  const httpConfig = HttpConfig(body, accessToken);
+  return new Promise((resolve, reject) => {
+    const options = Object.create(httpConfig);
+    options.url = url;
+    const onComplete = (results) => resolve(flattenStreamResults(results));
+    const onData = forEach
+      ? (data) => {
+        if (Array.isArray(data)) {
+          return data.forEach(forEach);
+        }
+        forEach(data);
+      }
+      : noop;
+    crossStream({
+      options,
+      onError: reject,
+      onComplete,
+      onData
+    });
+  });
+};
+
+const methodTypes = {
+  update: 0,
+  delete: 1
 };
 
 // limits
 const maxContentSize = 1024 * 5000; // 5mb
 const maxOpsPerRequest = 500;
 
-const flattenStreamResults = (results) => {
-  if (!Array.isArray(results[0])) {
-    return results;
-  }
-  return results.reduce((a, b) => a.concat(b), []);
-};
+export default (requestConfig) => {
+  const { dev } = requestConfig;
 
-const noop = () => {};
-
-function filter(filter) {
-  const props = {
-    _filter: {
-      writable: false,
-      value: filter
-    }
-  };
-  return Object.create(this, props);
-}
-
-export default ({
-  projectID,
-  dev = false,
-  // the following props are only for testing purposes
-  origin: customOrigin,
-  path: customPath
-}) => {
-  const request = async (
-    query,
-    variables,
-    queryType = '', // Query | Mutation (for non-graphql requests)
-    forEach
-  ) => {
-    const isGraphql = !!variables;
-    const body = isGraphql
-      ? {
-        query,
-        variables,
-      }
-      : {
-        payload: query,
-      };
-    if (dev) {
-      body.dev = 1;
-    }
-    const path = customPath
-      || (
-        isGraphql
-          ? `/api/graphql/${projectID}`
-          : `/api/main/${queryType}/${projectID}`
-      );
-    const accessToken = session.get().accessToken;
-    const url = constructApiUrl(path, projectID, customOrigin);
-    const config = {
-      method: 'POST',
-      headers: await constructRequestHeaders(accessToken),
-      body: JSON.stringify(body),
-    };
-    if (isGraphql) {
-      const response = fetch(url, config).then(handlePromiseJSON);
-      return response.then(handleJSONdata);
-    }
-    return new Promise((resolve, reject) => {
-      const options = Object.create(config);
-      options.url = url;
-      const onComplete = (results) => resolve(flattenStreamResults(results));
-      const onData = forEach
-        ? (data) => {
-          if (Array.isArray(data)) {
-            return data.forEach(forEach);
-          }
-          forEach(data);
-        }
-        : noop;
-      crossStream({
-        options,
-        onError: reject,
-        onComplete,
-        onData
-      });
-    });
-  };
   let operations = {};
   let opResponse;
   let opTimer;
@@ -109,6 +96,7 @@ export default ({
     large.
    */
   let totalRequestContent = '';
+
   const batchDelay = 0;
 
   const flush = () => {
@@ -128,15 +116,23 @@ export default ({
       this._filter = {};
     }
 
-    set(query, options, methodType = 0) {
+    set(_id, query, options, methodType = methodTypes.update) {
       const { collection } = this;
       const opsList = operations[collection] = operations[collection] || [];
 
-      if (opsList.length === maxOpsPerRequest) {
+      const maxOpsReached = opsList.length === maxOpsPerRequest;
+      if (maxOpsReached) {
         flush();
       }
 
       const { _filter: filter } = this;
+      if (
+        typeof _id !== 'undefined'
+        && _id !== null
+      ) {
+        filter._id = _id;
+      }
+
       const op = query
         ? [methodType, filter, query]
         : [methodType, filter];
@@ -162,7 +158,7 @@ export default ({
       opsList.push(op);
       opResponse = opResponse || new Promise((resolve, reject) => {
         promiseResolver = () => {
-          request(operations, null, 'Mutation')
+          request(operations, null, 'Mutation', null, requestConfig)
             .then(resolve)
             .catch(reject);
         };
@@ -173,27 +169,28 @@ export default ({
       });
     }
 
+    update(_id, value, options) {
+      return this.set(_id, { $set: value }, options);
+    }
+
     get(filter, opts, forEach) {
       const options = opts || {};
       options.filter = filter || {};
       options.collection = this.collection;
-      return request(options, null, 'Query', forEach);
+      return request(options, null, 'Query', forEach, requestConfig);
     }
 
-    delete() {
-      return this.set(null, null, 1);
-    }
-
-    id(_id) {
-      return filter.call(this, { _id });
+    delete(_id) {
+      return this.set(_id, null, null, methodTypes.delete);
     }
   }
 
-  request.collection = (collection) => {
+  const collection = (collection) => {
     return new Methods(collection);
   };
 
-  request.flush = flush;
-
-  return request;
+  return {
+    collection,
+    flush
+  };
 };

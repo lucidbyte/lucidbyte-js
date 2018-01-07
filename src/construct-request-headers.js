@@ -4,7 +4,7 @@ const getAccessToken = () => {
   return session.exists() && session.get().accessToken;
 };
 
-export default async (accessToken = getAccessToken()) => {
+export default (accessToken = getAccessToken()) => {
   const headers = {
     // Authorization: `Bearer ${accessToken}`,
     'Content-Type': 'application/json'
