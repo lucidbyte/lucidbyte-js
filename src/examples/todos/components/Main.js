@@ -23,7 +23,7 @@ class LoginButton extends Component {
     isLoggedIn: false
   }
 
-  async componentDidMount() {
+  componentDidMount() {
 
     auth.onAuthStateChange(({ loggedIn }) => {
       this.setState({ isLoggedIn: loggedIn });

@@ -6,7 +6,7 @@ const isDev = process.env.NODE_ENV === 'development';
 module.exports = {
   entry: {
     lucidbyte: './src/index.js',
-    'lucidbyte-examples': './src/examples/todos/src/index.js'
+    'lucidbyte-examples': './src/examples/todos/src/index.js',
   },
   output: {
     libraryTarget: 'umd',

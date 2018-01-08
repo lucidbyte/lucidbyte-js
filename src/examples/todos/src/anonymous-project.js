@@ -4,6 +4,7 @@
 import { h, Component } from 'preact';
 import queryString from 'query-string';
 import lucidbyte from '../../../index';
+import 'regenerator-runtime/runtime';
 
 const apiUrls = {
   remote: 'https://test.remote.lelandkwong.com',

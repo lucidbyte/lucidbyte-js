@@ -57,6 +57,7 @@ export default (
     requestBody,
     accessToken
   );
+
   return new Promise((resolve, reject) => {
     const options = Object.create(httpConfig);
     options.url = url;
