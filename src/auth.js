@@ -50,8 +50,6 @@ const AuthInstance = ({
         email,
         projectID
       })
-    }).catch(err => {
-      console.error(err);
     });
   };
 

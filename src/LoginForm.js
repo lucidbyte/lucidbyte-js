@@ -48,12 +48,15 @@ class Input extends Component {
   }
 }
 
-const EmailPrompt = ({ onSubmit, onInput, value, sendInProgress }) => (
+const EmailPrompt = ({ onSubmit, onInput, value, sendInProgress, loginError }) => (
   <form className='Login__EmailForm' onSubmit={onSubmit}>
     <h2 className='Login__EmailTitle'>Authenticate</h2>
     {!sendInProgress
       ? <p>To sign up or log in, fill in your email address below:</p>
       : <p>Sending you an email code...</p>
+    }
+    {loginError &&
+      <ErrorMessage error='Sorry, we encountered an error. Please try again.' />
     }
     <Input
       className='Login__EmailInput'
@@ -98,15 +101,6 @@ const AwaitingConfirmation = ({ onSubmit, onInput, onUndo, value, email, error }
     </div>
   );
 };
-
-const initialState = () => ({
-  email: '',
-  emailSent: false,
-  emailSendInProgress: false,
-
-  code: '',
-  codeError: ''
-});
 
 const Style = () =>
   <style>{/* @css */`
@@ -169,6 +163,15 @@ const Style = () =>
     }
   `}</style>;
 
+const initialState = () => ({
+  email: '',
+  emailSent: false,
+  emailSendInProgress: false,
+
+  code: '',
+  codeError: ''
+});
+
 export default class LoginForm extends Component {
   state = initialState()
 
@@ -189,6 +192,7 @@ export default class LoginForm extends Component {
       this.sendInProgressState(false);
       this.setState({ emailSent: true });
     }).catch(err => {
+      this.setState({ loginError: true });
       console.error(err);
       this.sendInProgressState(false);
     });
@@ -241,6 +245,7 @@ export default class LoginForm extends Component {
               onSubmit={this.handleSubmit}
               value={state.email}
               sendInProgress={state.emailSendInProgress}
+              loginError={state.loginError}
             />
           ) : (
             <AwaitingConfirmation
