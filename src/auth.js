@@ -5,6 +5,12 @@ import constructRequestHeaders from './construct-request-headers';
 let hasExpired = false;
 let refreshTokenTimer = null;
 
+const msPerHour = 1000 * 60 * 60;
+const hoursToMS = (hours) =>
+  msPerHour * hours;
+const durationFromExpiration = (expiration) =>
+  expiration - new Date().getTime();
+
 // callbacks are global since there should only
 // be one instance of authentication happening at any given time
 const authStateChangeCallbacks = [];
@@ -29,12 +35,28 @@ const logout = () => {
   authStateChangeFn();
 };
 
+const defaults = {
+  tokenRefreshRate: hoursToMS(2)
+};
+
 const AuthInstance = ({
   // this is for testing purposes only, normally the origin
   // should be pointing the the production server
   origin: customOrigin,
-  projectID
+  projectID,
+  options = {}
 }) => {
+  const mergedOptions = Object.assign({}, defaults, options);
+  const {
+    tokenRefreshRate
+  } = mergedOptions;
+
+  if (process.env.NODE_ENV === 'development') {
+    if (tokenRefreshRate < defaults.tokenRefreshRate) {
+      throw 'token refresh rate must be at least 2 hours';
+    }
+  }
+
   if (typeof document === 'undefined') {
     return {};
   }
@@ -59,12 +81,15 @@ const AuthInstance = ({
       method: 'GET',
     }).then(res => res.json())
       .then(json => {
-        const { accessToken, expiresAt, userID } = json;
+        const { expiresAt, userID } = json;
         if (json.error) {
           session.end();
           return json;
         }
-        session.set({ accessToken, expiresAt, userId: userID });
+        session.set({
+          ...json,
+          duration: durationFromExpiration(expiresAt)
+        });
         authStateChangeFn(userID);
         return json;
       }).catch(err => {
@@ -79,8 +104,12 @@ const AuthInstance = ({
       method: 'GET',
     }).then(res => res.json())
       .then(res => {
-        const { accessToken, expiresAt } = res;
-        session.set({ accessToken, expiresAt, userId: session.get().userId });
+        const { expiresAt } = res;
+        session.set({
+          ...res,
+          duration: durationFromExpiration(expiresAt),
+          userId: session.get().userId
+        });
         return res;
       }).catch(err => {
         console.error(err);
@@ -91,11 +120,29 @@ const AuthInstance = ({
     if (refreshTokenTimer) {
       return;
     }
-    const refreshRate =  1000 * 60 * 60 * 2; // refresh every 2 hours
+    const tokenDuration = session.get().duration;
     const expiresIn = expiresAt - new Date().getTime();
-    const delay = expiresIn < refreshRate ? 0 : refreshRate;
-    hasExpired = delay <= 0;
+    /*
+      Refresh 2 hours from last refresh. This allows us to keep the session fresher
+      as long as the user is continuously using it.
+     */
+    const delay = expiresIn - tokenDuration + tokenRefreshRate;
+
+    hasExpired = expiresIn <= 0;
     if (!hasExpired) {
+
+      // log session duration info
+      if (process.env.NODE_ENV === 'development') {
+        const MSToHours = (ms) =>
+          Number((ms / msPerHour).toFixed(2));
+
+        console.log({
+          refreshIn: MSToHours(delay) + 'hrs',
+          expiresIn: MSToHours(expiresIn),
+          expiresAt: new Date(expiresAt)
+        });
+      }
+
       refreshTokenTimer = setTimeout(() => {
         getRefreshToken()
           .then(scheduleTokenRefresh);

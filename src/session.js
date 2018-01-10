@@ -2,7 +2,7 @@ const ns = 'lucidbyte';
 
 const session = {
   set(sessionParams = {
-    accessToken: '', expiresAt: 0, userId: ''
+    accessToken: '', expiresAt: 0, userId: '', duration: ''
   }) {
     const session = JSON.stringify(sessionParams);
     localStorage.setItem(ns, session);
