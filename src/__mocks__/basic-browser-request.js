@@ -8,6 +8,7 @@ const mockItems = () => new Array(6).fill(0).map((_, i) => {
 jest.useFakeTimers();
 
 module.exports = function(opts, done) {
+  console.log(opts.url);
   const path = opts.url.slice(1);
   const mockResponseObject = {};
   ({

@@ -1,6 +1,6 @@
 /* global test */
 
-import stream, { requiredCallbackError, requiredErrorCallbackError } from '../stream';
+import stream, { requiredCallbackError } from '../stream';
 import { mockItems } from 'basic-browser-request';
 
 describe('stream test', () => {
@@ -60,17 +60,10 @@ describe('stream test', () => {
   test('throws an error for missing onData or onComplete callback', () => {
     expect(() => {
       stream({
-        options: {}
+        options: {
+          url: '/error'
+        }
       });
     }).toThrowError(requiredCallbackError);
-  });
-
-  test('throws an error for missing onError callback', () => {
-    expect(() => {
-      stream({
-        options: {},
-        onComplete() {}
-      });
-    }).toThrowError(requiredErrorCallbackError);
   });
 });

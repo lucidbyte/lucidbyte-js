@@ -64,23 +64,10 @@ function Options(opts, onData = noop, hasOnComplete) {
 export const requiredCallbackError = `must provide at least 'onData' or 'onComplete' callback`;
 export const requiredErrorCallbackError = `must provide 'onError' callback`;
 
-const missingRequiredCallback = (onError, onData, onComplete) => {
-  const hasOneRequiredCallback = onData || (onComplete !== noop);
-  if (!hasOneRequiredCallback) {
-    return requiredCallbackError;
-  }
-
-  if (!onError) {
-    return requiredErrorCallbackError;
-  }
-
-  return false;
-};
-
 export default function crossStream(config) {
   const {
     options,
-    onError, // called on xhr error
+    onError = noop, // called on xhr error
     /*
       Called with final parsed JSON payload. If this function is omitted, then
       it'll effectively be a noop and spend no cpu resources.
@@ -94,14 +81,29 @@ export default function crossStream(config) {
     onData
   } = config;
 
+  const hasOnComplete = onComplete !== noop;
+
   if (process.env.NODE_ENV === 'development') {
-    const missingCallbackError = missingRequiredCallback(onError, onData, onComplete);
+    const missingRequiredCallback = (onError, onData) => {
+      const hasOneRequiredCallback = !!onData || hasOnComplete;
+      if (!hasOneRequiredCallback) {
+        return requiredCallbackError;
+      }
+
+      if (!onError) {
+        return requiredErrorCallbackError;
+      }
+
+      return false;
+    };
+
+    const missingCallbackError = missingRequiredCallback(onError, onData, hasOnComplete);
     if (missingCallbackError) {
       throw missingCallbackError;
     }
   }
 
-  const opts = Options(options, onData, onComplete !== noop);
+  const opts = Options(options, onData, onComplete);
 
   function done(error, response, text) {
     const _s = opts[STATE];
@@ -121,16 +123,20 @@ export default function crossStream(config) {
       onComplete(_s.parsedChunks);
     // handle remainingChunk
     } else {
-      const isNdjsonResponse = isNdjson(text);
-      const finalChunk = isNdjsonResponse
-        ? handleNdjsonChunk(remainingChunk)
-        : JSON.parse(remainingChunk);
+      try {
+        const isNdjsonResponse = isNdjson(text);
+        const finalChunk = isNdjsonResponse
+          ? handleNdjsonChunk(remainingChunk)
+          : JSON.parse(remainingChunk);
 
-      // emit remaining data objects
-      emitData.call(opts, finalChunk);
-      onComplete(
-        isNdjsonResponse ? _s.parsedChunks : finalChunk
-      );
+        // emit remaining data objects
+        emitData.call(opts, finalChunk);
+        onComplete(
+          isNdjsonResponse ? _s.parsedChunks : finalChunk
+        );
+      } catch(err) {
+        onError(err);
+      }
     }
   }
 

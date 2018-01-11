@@ -1,17 +1,38 @@
 import request from './request';
 
-const docUrl = (hash) => `https://test.remote.lelandkwong.com/docs#${hash}`;
+let checkTypes;
+let PropTypes;
 
-const methodTypes = {
+if (process.env.NODE_ENV === 'development') {
+  PropTypes = require('prop-types');
+  checkTypes = (propTypes, props, method) =>
+    PropTypes.checkPropTypes(propTypes, props, 'argument', method);
+}
+
+const opTypes = {
   update: 0,
-  delete: 1
+  delete: 1,
+  upsert: 2,
+  insert: 3
 };
 
 // limits
-const maxContentSize = 1024 * 5000; // 5mb
-const maxOpsPerRequest = 500;
+const limits = {
+  maxContentSize: 1024 * 1024 * 1, // 1MB
+  maxOpsPerRequest: 500
+};
 
-export default (requestConfig) => {
+const promiseReturnSingleValue = res => res[0];
+
+export default (requestConfig, clientOptions = {}) => {
+  const {
+    lengthLimit
+  } = clientOptions;
+
+  const maxLength = lengthLimit < limits.maxContentSize
+    ? lengthLimit
+    : limits.maxContentSize;
+
   // batch scope
   let operations = {};
   let opResponse;
@@ -41,11 +62,21 @@ export default (requestConfig) => {
       this.collection = collection;
     }
 
-    set(_id, documentObject, options, methodType = methodTypes.update) {
+    set(_id, document, options, opType = opTypes.upsert) {
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          _id: PropTypes.string.isRequired,
+          document: PropTypes.object.isRequired,
+          options: PropTypes.object,
+          opType: PropTypes.number
+        };
+        checkTypes(types, { _id, document, options }, 'get');
+      }
+
       const { collection } = this;
       const opsList = operations[collection] = operations[collection] || [];
 
-      const maxOpsReached = opsList.length === maxOpsPerRequest;
+      const maxOpsReached = opsList.length === limits.maxOpsPerRequest;
       if (maxOpsReached) {
         flush();
       }
@@ -58,26 +89,27 @@ export default (requestConfig) => {
         filter._id = _id;
       }
 
-      const op = documentObject
-        ? [methodType, filter, documentObject]
-        : [methodType, filter];
+      const op = document
+        ? [opType, filter, document]
+        : [opType, filter];
       if (options) {
         op.push(options);
       }
 
       if (process.env.NODE_ENV === 'development') {
         const payloadString = JSON.stringify(op);
-        const batchSizeTooLarge = totalRequestContent.length + payloadString.length >= maxContentSize;
+        const batchSizeTooLarge = (totalRequestContent.length + payloadString.length) >= maxLength;
+        totalRequestContent += payloadString;
         if (batchSizeTooLarge) {
-          const error = `Payload exceeded max of ${maxContentSize}.\n` +
-            `Try breaking up requests into smaller chunks with \`flush\` method.`;
-          return Promise.reject({
+          const error = `Combined payload size exceeded max of ${maxLength} characters.\n` +
+            `You can break up requests into smaller batches with \`flush\` method.`;
+          throw({
             error,
+            combinedPayloadSize: totalRequestContent.length,
             payloadSize: payloadString.length,
             payload: op
           });
         }
-        totalRequestContent += payloadString;
       }
 
       opsList.push(op);
@@ -94,37 +126,145 @@ export default (requestConfig) => {
       });
     }
 
-    update(_id, value, options) {
-      return this.set(_id, { $set: value }, options);
+    insert(value) {
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          value: PropTypes.object.isRequired
+        };
+        checkTypes(types, { value }, 'get');
+      }
+
+      return this.set(null, value, null, opTypes.insert);
     }
 
-    get(_id, opts) {
+    update(_id, value) {
       if (process.env.NODE_ENV === 'development') {
-        const isMissingId = typeof _id === 'undefined' || _id === null;
-        if (isMissingId) {
-          const error = `missing \`_id\` argument in \`get\` method.
-  ${docUrl('get')}`;
-          throw(error);
-        }
+        const types = {
+          _id: PropTypes.string.isRequired,
+          value: PropTypes.object
+        };
+        checkTypes(
+          types,
+          { _id, value },
+          'get'
+        );
       }
-      return this.query({ _id }, opts);
+
+      return this.set(_id, { $set: value }, null, opTypes.update);
+    }
+
+    get(_id, options) {
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          _id: PropTypes.string.isRequired,
+          options: PropTypes.object
+        };
+        checkTypes(
+          types,
+          { _id, options },
+          'get'
+        );
+      }
+
+      return this.query({ _id }, options).then(promiseReturnSingleValue);
     }
 
     delete(_id) {
-      return this.set(_id, null, null, methodTypes.delete);
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          _id: PropTypes.string.isRequired,
+        };
+        checkTypes(
+          types,
+          { _id },
+          'delete'
+        );
+      }
+
+      return this.set(_id, null, null, opTypes.delete);
     }
 
-    query(filter, options, forEach) {
+    query(filter, options, forEach, onError, onComplete) {
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          filter: PropTypes.object,
+          options: PropTypes.object,
+          forEach: PropTypes.func,
+          onError: PropTypes.func,
+          onComplete: PropTypes.func
+        };
+        checkTypes(
+          types,
+          { filter, options, forEach },
+          'query'
+        );
+      }
+
       const query = [
         this.collection,
         filter || {},
         options || {},
       ];
-      return request(query, null, 'Query', forEach, requestConfig);
+      return request(query, null, 'Query', { forEach, onError, onComplete }, requestConfig);
+    }
+
+    aggregate(pipelineStages, options, forEach, onError, onComplete) {
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          pipelineStages: PropTypes.array,
+          options: PropTypes.object,
+          forEach: PropTypes.func,
+          onError: PropTypes.func,
+          onComplete: PropTypes.func
+        };
+        checkTypes(
+          types,
+          { pipelineStages, options, forEach },
+          'query'
+        );
+      }
+
+      const query = [
+        this.collection,
+        pipelineStages || [],
+        options || {},
+      ];
+      return request(query, null, 'Aggregate', { forEach, onError, onComplete }, requestConfig);
+    }
+
+    createIndex(fields, options) {
+      if (process.env.NODE_ENV === 'development') {
+        const types = {
+          fields: PropTypes.object.isRequired,
+          options: PropTypes.object,
+        };
+        checkTypes(
+          types,
+          { fields, options },
+          'query'
+        );
+      }
+
+      const query = [
+        this.collection,
+        fields,
+        options
+      ];
+      return request(query, null, 'CreateIndex', null, requestConfig);
+    }
+
+    getIndexes() {
+      const query = [this.collection];
+      return request(query, null, 'GetIndexes', null, requestConfig);
     }
   }
 
   const collection = (collection) => {
+    if (process.env.NODE_ENV === 'development') {
+      const types = { collection: PropTypes.string.isRequired };
+      checkTypes(types, { collection }, 'collection');
+    }
+
     return new Methods(collection);
   };
 

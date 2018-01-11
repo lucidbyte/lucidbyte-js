@@ -22,11 +22,12 @@ const HttpConfig = (body, accessToken) => ({
 export default (
   query,
   variables,
-  queryType = '', // Query | Mutation (for non-graphql requests)
-  forEach,
+  queryType = '', // Query | Mutation
+  callbacks = {},
   config = {},
   customRequest,
 ) => {
+  const { forEach, onError, onComplete } = callbacks;
   const {
     projectID,
     dev = false,
@@ -44,10 +45,11 @@ export default (
     return customRequest({ url, httpConfig });
   }
 
-  const path = customPath || `/api/main/${queryType}/${projectID}`;
+  const path = customPath || `/api/main/${projectID}`;
   const url = constructApiUrl(path, projectID, customOrigin);
   const body = {
     payload: query,
+    type: queryType
   };
   if (dev) {
     body.dev = 1;
@@ -57,24 +59,36 @@ export default (
     requestBody,
     accessToken
   );
+  const options = Object.create(httpConfig);
+  options.url = url;
+
+  const onData = forEach
+    ? (data) => {
+      if (Array.isArray(data)) {
+        return data.forEach(forEach);
+      }
+      forEach(data);
+    }
+    : noop;
+
+  if (forEach) {
+    return crossStream({
+      options,
+      onData,
+      onError,
+      onComplete
+    });
+  }
 
   return new Promise((resolve, reject) => {
-    const options = Object.create(httpConfig);
-    options.url = url;
-    const onComplete = (results) => resolve(flattenStreamResults(results));
-    const onData = forEach
-      ? (data) => {
-        if (Array.isArray(data)) {
-          return data.forEach(forEach);
-        }
-        forEach(data);
-      }
-      : noop;
+    const onComplete = (results) =>
+      resolve(flattenStreamResults(results));
+
     crossStream({
       options,
+      onData,
       onError: reject,
       onComplete,
-      onData
     });
   });
 };
