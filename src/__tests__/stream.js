@@ -53,7 +53,7 @@ describe('stream test', () => {
       onData,
       onComplete
     });
-    expect(onData.mock.calls.length).toBe(6);
+    expect(onData.mock.calls.length).toBe(1);
     expect(onComplete.mock.calls[0][0]).toEqual(mockItems());
   });
 

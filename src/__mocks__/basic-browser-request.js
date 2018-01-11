@@ -8,9 +8,15 @@ const mockItems = () => new Array(6).fill(0).map((_, i) => {
 jest.useFakeTimers();
 
 module.exports = function(opts, done) {
-  console.log(opts.url);
   const path = opts.url.slice(1);
-  const mockResponseObject = {};
+  const mockResponseObject = (contentType) => ({
+    xhr: {
+      getResponseHeader() {
+        return contentType;
+      }
+    }
+  });
+
   ({
     chunked() {
       const items = mockItems();
@@ -20,7 +26,7 @@ module.exports = function(opts, done) {
         totalResponseText += ndjsonResponse;
         opts.onData(ndjsonResponse);
       });
-      done(null, mockResponseObject, totalResponseText);
+      done(null, mockResponseObject('application/ndjson'), totalResponseText);
     },
 
     partialChunked() {
@@ -36,14 +42,14 @@ module.exports = function(opts, done) {
           opts.onData(fragment);
         }
       });
-      done(null, mockResponseObject, totalResponseText);
+      done(null, mockResponseObject('application/ndjson'), totalResponseText);
     },
 
     nonChunked() {
       const items = mockItems();
       const totalResponseText = JSON.stringify(items);
       opts.onData(totalResponseText);
-      done(null, mockResponseObject, totalResponseText);
+      done(null, mockResponseObject('application/json'), totalResponseText);
     }
   })[path]();
 };

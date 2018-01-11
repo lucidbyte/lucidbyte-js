@@ -3,45 +3,46 @@ const makeRequest = require('basic-browser-request');
 const STATE = '__state__';
 const noop = () => {};
 
-// [spec](http://ndjson.org/)
-const isNdjson = (data) =>
-  data.slice(-1) === '\n';
-
 const parseChunk = chunk => JSON.parse(chunk);
 
-function handleNdjsonChunk(data) {
-  const ndjsonChunks = data.trim().split('\n');
-  return ndjsonChunks.map(parseChunk);
-}
-
-function emitData(parsedChunks) {
+function emitData(chunk) {
   const { originalOnData } = this;
   const {
     parsedChunks: parsedChunksState,
     hasOnComplete,
   } = this[STATE];
-  // emit the data once per ndjson chunk
-  for (let i = 0; i < parsedChunks.length; i++) {
-    const chunk = parsedChunks[i];
-    originalOnData(chunk);
-    if (hasOnComplete) {
-      parsedChunksState.push(chunk);
-    }
+  originalOnData(chunk);
+  if (hasOnComplete) {
+    parsedChunksState.push(chunk);
   }
 }
 
 function handleChunk(data) {
   const _s = this[STATE];
-  const pChunk = _s.partialChunk += data;
-  /*
-    Its possible that we get partial json, so we need to check if its valid
-    ndjson by checking for a newline at the end.
-   */
-  if (isNdjson(pChunk)) {
-    const parsedChunks = handleNdjsonChunk(pChunk);
-    emitData.call(this, parsedChunks);
-    _s.lastParsedIndex += pChunk.length;
-    _s.partialChunk = '';
+  // total accumulated unparsed chunk
+  const tChunk = _s.partialChunk + data;
+  const lastNewlineIdx = tChunk.lastIndexOf('\n');
+  // [spec](http://ndjson.org/)
+  const hasNdjson = lastNewlineIdx !== -1;
+  const sliceEnd = lastNewlineIdx + 1;
+
+  if (hasNdjson) {
+    let i = 0;
+    let ndjson = '';
+    while(i < sliceEnd) {
+      const char = tChunk[i];
+      ndjson += char;
+      const isNewline = char === '\n';
+      if (isNewline) {
+        emitData.call(this, parseChunk(ndjson));
+        ndjson = '';
+      }
+      _s.lastParsedIndex++;
+      i++;
+    }
+    _s.partialChunk = tChunk.substr(sliceEnd);
+  } else {
+    _s.partialChunk = tChunk;
   }
 }
 
@@ -105,9 +106,13 @@ export default function crossStream(config) {
 
   const opts = Options(options, onData, onComplete);
 
-  function done(error, response, text) {
+  function done(
+    error,
+    response,
+    text
+  ) {
     const _s = opts[STATE];
-    const { lastParsedIndex } = opts[STATE];
+    const { partialChunk } = opts[STATE];
 
     const isCancelled = !arguments.length;
     if (isCancelled) {
@@ -118,22 +123,22 @@ export default function crossStream(config) {
       return onError(error);
     }
 
-    const remainingChunk = text.substr(lastParsedIndex);
-    if (!remainingChunk.length) {
+    if (!partialChunk.length) {
       onComplete(_s.parsedChunks);
     // handle remainingChunk
     } else {
+      const contentType = response.xhr.getResponseHeader('Content-Type');
+      const isNdjson = contentType.indexOf('application/ndjson') !== -1;
       try {
-        const isNdjsonResponse = isNdjson(text);
-        const finalChunk = isNdjsonResponse
-          ? handleNdjsonChunk(remainingChunk)
-          : JSON.parse(remainingChunk);
-
-        // emit remaining data objects
-        emitData.call(opts, finalChunk);
-        onComplete(
-          isNdjsonResponse ? _s.parsedChunks : finalChunk
-        );
+        if (isNdjson) {
+          // handle remaining text response
+          handleChunk.call(opts, partialChunk);
+          onComplete(_s.parsedChunks);
+        } else {
+          const jsonResponse = JSON.parse(text);
+          emitData.call(opts, jsonResponse);
+          onComplete(jsonResponse);
+        }
       } catch(err) {
         onError(err);
       }

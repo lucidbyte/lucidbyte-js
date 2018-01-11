@@ -23,11 +23,11 @@ export default (
   query,
   variables,
   queryType = '', // Query | Mutation
-  callbacks = {},
+  callbacks,
   config = {},
   customRequest,
 ) => {
-  const { forEach, onError, onComplete } = callbacks;
+  const { forEach, onError, onComplete } = callbacks || {};
   const {
     projectID,
     dev = false,
@@ -64,9 +64,11 @@ export default (
 
   const onData = forEach
     ? (data) => {
+      // handle nested array
       if (Array.isArray(data)) {
         return data.forEach(forEach);
       }
+      // otherwise just treat it like a normal list
       forEach(data);
     }
     : noop;
