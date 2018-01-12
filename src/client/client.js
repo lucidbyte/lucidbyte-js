@@ -1,13 +1,4 @@
-import request from './request';
-
-let checkTypes;
-let PropTypes;
-
-if (process.env.NODE_ENV === 'development') {
-  PropTypes = require('prop-types');
-  checkTypes = (propTypes, props, method) =>
-    PropTypes.checkPropTypes(propTypes, props, 'argument', method);
-}
+import request from '../request';
 
 const opTypes = {
   update: 0,
@@ -64,13 +55,7 @@ export default (requestConfig, clientOptions = {}) => {
 
     set(_id, document, options, opType = opTypes.upsert) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          _id: PropTypes.string,
-          document: PropTypes.object.isRequired,
-          options: PropTypes.object,
-          opType: PropTypes.number
-        };
-        checkTypes(types, { _id, document, options }, 'set');
+        require('./check-types').set({ _id: {}, document, options, opType });
       }
 
       const { collection } = this;
@@ -128,10 +113,7 @@ export default (requestConfig, clientOptions = {}) => {
 
     insert(value) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          value: PropTypes.object.isRequired
-        };
-        checkTypes(types, { value }, 'insert');
+        require('./check-types').insert({ value });
       }
 
       return this.set(null, value, null, opTypes.insert);
@@ -139,15 +121,7 @@ export default (requestConfig, clientOptions = {}) => {
 
     update(_id, value) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          _id: PropTypes.string.isRequired,
-          value: PropTypes.object
-        };
-        checkTypes(
-          types,
-          { _id, value },
-          'get'
-        );
+        require('./check-types').update({ _id, value });
       }
 
       return this.set(_id, { $set: value }, null, opTypes.update);
@@ -155,15 +129,7 @@ export default (requestConfig, clientOptions = {}) => {
 
     get(_id, options) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          _id: PropTypes.string.isRequired,
-          options: PropTypes.object
-        };
-        checkTypes(
-          types,
-          { _id, options },
-          'get'
-        );
+        require('./check-types').get({ _id, options });
       }
 
       return this.query({ _id }, options).then(promiseReturnSingleValue);
@@ -171,14 +137,7 @@ export default (requestConfig, clientOptions = {}) => {
 
     delete(_id) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          _id: PropTypes.string.isRequired,
-        };
-        checkTypes(
-          types,
-          { _id },
-          'delete'
-        );
+        require('./check-types').del({ _id });
       }
 
       return this.set(_id, null, null, opTypes.delete);
@@ -186,18 +145,8 @@ export default (requestConfig, clientOptions = {}) => {
 
     query(filter, options, forEach, onError, onComplete) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          filter: PropTypes.object,
-          options: PropTypes.object,
-          forEach: PropTypes.func,
-          onError: PropTypes.func,
-          onComplete: PropTypes.func
-        };
-        checkTypes(
-          types,
-          { filter, options, forEach },
-          'query'
-        );
+        require('./check-types')
+          .query({ filter, options, forEach, onError, onComplete });
       }
 
       const query = [
@@ -210,18 +159,9 @@ export default (requestConfig, clientOptions = {}) => {
 
     aggregate(pipelineStages, options, forEach, onError, onComplete) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          pipelineStages: PropTypes.array,
-          options: PropTypes.object,
-          forEach: PropTypes.func,
-          onError: PropTypes.func,
-          onComplete: PropTypes.func
-        };
-        checkTypes(
-          types,
-          { pipelineStages, options, forEach },
-          'query'
-        );
+        require('./check-types').aggregate({
+          pipelineStages, options, forEach, onError, onComplete
+        });
       }
 
       const query = [
@@ -234,15 +174,7 @@ export default (requestConfig, clientOptions = {}) => {
 
     createIndex(fields, options) {
       if (process.env.NODE_ENV === 'development') {
-        const types = {
-          fields: PropTypes.object.isRequired,
-          options: PropTypes.object,
-        };
-        checkTypes(
-          types,
-          { fields, options },
-          'query'
-        );
+        require('./check-types').createIndex({ fields, options });
       }
 
       const query = [
@@ -266,8 +198,7 @@ export default (requestConfig, clientOptions = {}) => {
 
   const collection = (collection) => {
     if (process.env.NODE_ENV === 'development') {
-      const types = { collection: PropTypes.string.isRequired };
-      checkTypes(types, { collection }, 'collection');
+      require('./check-types').collection({ collection });
     }
 
     return new Methods(collection);
