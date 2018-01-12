@@ -39,7 +39,9 @@ module.exports = {
         : new UglifyJsPlugin()
     ),
     new webpack.DefinePlugin({
-      'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production')
+      'DEVELOPMENT': isDev,
+      'PRODUCTION': !isDev,
+      // 'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production')
     })
   ]
 };
