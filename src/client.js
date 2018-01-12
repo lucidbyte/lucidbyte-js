@@ -65,12 +65,12 @@ export default (requestConfig, clientOptions = {}) => {
     set(_id, document, options, opType = opTypes.upsert) {
       if (process.env.NODE_ENV === 'development') {
         const types = {
-          _id: PropTypes.string.isRequired,
+          _id: PropTypes.string,
           document: PropTypes.object.isRequired,
           options: PropTypes.object,
           opType: PropTypes.number
         };
-        checkTypes(types, { _id, document, options }, 'get');
+        checkTypes(types, { _id, document, options }, 'set');
       }
 
       const { collection } = this;
@@ -131,7 +131,7 @@ export default (requestConfig, clientOptions = {}) => {
         const types = {
           value: PropTypes.object.isRequired
         };
-        checkTypes(types, { value }, 'get');
+        checkTypes(types, { value }, 'insert');
       }
 
       return this.set(null, value, null, opTypes.insert);
@@ -256,6 +256,11 @@ export default (requestConfig, clientOptions = {}) => {
     getIndexes() {
       const query = [this.collection];
       return request(query, null, 'GetIndexes', null, requestConfig);
+    }
+
+    has(_id) {
+      return this.get(_id, { countOnly: 1 })
+        .then(res => !!res.count);
     }
   }
 

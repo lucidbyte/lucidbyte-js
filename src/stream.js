@@ -3,8 +3,6 @@ const makeRequest = require('basic-browser-request');
 const STATE = '__state__';
 const noop = () => {};
 
-const parseChunk = chunk => JSON.parse(chunk);
-
 function emitData(chunk) {
   const { originalOnData } = this;
   const {
@@ -27,18 +25,17 @@ function handleChunk(data) {
   const sliceEnd = lastNewlineIdx + 1;
 
   if (hasNdjson) {
-    let i = 0;
+    let i = -1;
     let ndjson = '';
-    while(i < sliceEnd) {
+    while(i++ < sliceEnd) {
       const char = tChunk[i];
       ndjson += char;
       const isNewline = char === '\n';
       if (isNewline) {
-        emitData.call(this, parseChunk(ndjson));
+        emitData.call(this, JSON.parse(ndjson));
+        _s.lastParsedIndex += ndjson.length;
         ndjson = '';
       }
-      _s.lastParsedIndex++;
-      i++;
     }
     _s.partialChunk = tChunk.substr(sliceEnd);
   } else {
@@ -112,7 +109,7 @@ export default function crossStream(config) {
     text
   ) {
     const _s = opts[STATE];
-    const { partialChunk } = opts[STATE];
+    const { lastParsedIndex } = opts[STATE];
 
     const isCancelled = !arguments.length;
     if (isCancelled) {
@@ -123,25 +120,26 @@ export default function crossStream(config) {
       return onError(error);
     }
 
-    if (!partialChunk.length) {
-      onComplete(_s.parsedChunks);
-    // handle remainingChunk
-    } else {
-      const contentType = response.xhr.getResponseHeader('Content-Type');
-      const isNdjson = contentType.indexOf('application/ndjson') !== -1;
-      try {
-        if (isNdjson) {
+    const contentType = response.xhr.getResponseHeader('Content-Type');
+    const isNdjson = contentType.indexOf('application/ndjson') !== -1;
+    try {
+      if (isNdjson) {
+        if (!_s.parsedChunks.length) {
+          _s.partialChunk = '';
+          handleChunk.call(opts, text);
           // handle remaining text response
-          handleChunk.call(opts, partialChunk);
-          onComplete(_s.parsedChunks);
         } else {
-          const jsonResponse = JSON.parse(text);
-          emitData.call(opts, jsonResponse);
-          onComplete(jsonResponse);
+          _s.partialChunk = '';
+          handleChunk.call(opts, text.substr(lastParsedIndex));
         }
-      } catch(err) {
-        onError(err);
+        onComplete(_s.parsedChunks);
+      } else {
+        const jsonResponse = JSON.parse(text);
+        emitData.call(opts, jsonResponse);
+        onComplete(jsonResponse);
       }
+    } catch(err) {
+      onError(err);
     }
   }
 

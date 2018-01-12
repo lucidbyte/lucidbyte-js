@@ -7,7 +7,8 @@ const getAccessToken = () => {
 export default (accessToken = getAccessToken()) => {
   const headers = {
     // Authorization: `Bearer ${accessToken}`,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'accept': 'application/json, application/ndjson'
   };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
