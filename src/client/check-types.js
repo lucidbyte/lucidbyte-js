@@ -1,82 +1,100 @@
-const PropTypes = require('prop-types');
-const checkTypes = (propTypes, props, method) =>
-  PropTypes.checkPropTypes(propTypes, props, 'argument', method);
+import { typeCheck } from 'type-check';
+
+const type = (type) => {
+  return {
+    isRequired: {
+      type,
+      required: true
+    },
+    type
+  };
+};
+
+const validateTypes = (types, args = {}, methodName) => {
+  for (const key in types) {
+    const val = args[key];
+    const { type, required } = types[key];
+    const isUndefined = typeof val === 'undefined';
+    if (required && isUndefined) {
+      return `Argument '${key}' is required in method 'get'.`;
+    }
+    if (!isUndefined && !typeCheck(type, val)) {
+      return `Expected argument '${key}' to be of type '${type}' in method '${methodName}'. Received '${val}'.`;
+    }
+  }
+};
 
 export const collection = (props) => {
-  const types = { collection: PropTypes.string.isRequired };
-  checkTypes(types, props, 'collection');
+  const types = { collection: type('string').isRequired };
+  return validateTypes(types, props, 'collection');
 };
 
 export const set = (props) => {
   const types = {
-    _id: PropTypes.string,
-    document: PropTypes.object,
-    options: PropTypes.object,
-    opType: PropTypes.number
+    _id: type('string'),
+    document: type('Object'),
+    options: type('Object'),
+    opType: type('number'),
   };
-  checkTypes(types, props, 'set');
+  return validateTypes(types, props, 'set');
 };
 
-export const get = (props) => {
+export const get = (args) => {
   const types = {
-    _id: PropTypes.string.isRequired,
-    options: PropTypes.object
+    _id: type('String').isRequired,
+    options: type('Object')
   };
-  checkTypes(types, props, 'get');
+  return validateTypes(types, args, 'get');
 };
 
 export const del = (props) => {
   const types = {
-    _id: PropTypes.string.isRequired,
+    _id: type('string').isRequired,
   };
-  checkTypes(types, props, 'delete');
+  return validateTypes(types, props, 'delete');
 };
 
 export const update = (props) => {
   const types = {
-    _id: PropTypes.string.isRequired,
-    value: PropTypes.object
+    _id: type('string').isRequired,
+    value: type('Object')
   };
-  checkTypes(types, props, 'update');
+  return validateTypes(types, props, 'update');
 };
 
 export const query = (props) => {
   const types = {
-    filter: PropTypes.object,
-    options: PropTypes.object,
-    forEach: PropTypes.func,
-    onError: PropTypes.func,
-    onComplete: PropTypes.func
+    filter: type('Object'),
+    options: type('Object'),
+    forEach: type('Func'),
+    onError: type('Func'),
+    onComplete: type('Func')
   };
-  checkTypes(types, props, 'query');
+  return validateTypes(types, props, 'query');
 };
 
 export const aggregate = (props) => {
   const types = {
-    pipelineStages: PropTypes.array,
-    options: PropTypes.object,
-    forEach: PropTypes.func,
-    onError: PropTypes.func,
-    onComplete: PropTypes.func
+    pipelineStages: type('Array').isRequired,
+    options: type('Object'),
+    forEach: type('Func'),
+    onError: type('Func'),
+    onComplete: type('Func')
   };
-  checkTypes(types, props, 'query');
+  return validateTypes(types, props, 'aggregate');
 };
 
 export const insert = (props) => {
   const types = {
-    value: PropTypes.object.isRequired
+    value: type('Object').isRequired
   };
-  checkTypes(types, props, 'insert');
+  return validateTypes(types, props, 'insert');
 };
 
 export const createIndex = (props) => {
   const types = {
-    fields: PropTypes.object.isRequired,
-    options: PropTypes.object,
+    fields: type('Object').isRequired,
+    options: type('Object'),
   };
-  checkTypes(
-    types,
-    props,
-    'query'
-  );
+  return validateTypes(types, props, 'query');
 };

@@ -1,5 +1,4 @@
 /* global DEVELOPMENT */
-
 import request from '../request';
 
 const opTypes = {
@@ -15,23 +14,31 @@ const limits = {
   maxOpsPerRequest: 500
 };
 
-const promiseReturnSingleValue = res => res[0];
+const promiseReturnSingleValue = res => {
+  const val = res[0];
+  return typeof val === 'undefined' ? null : val;
+};
 const batchDelay = 0;
 const maxLength = limits.maxContentSize;
 
+const noop = () => {};
+
 class Methods {
-  constructor(collection, batch, requestConfig) {
+  constructor(collection, batch, options, requestConfig) {
     this.collection = collection;
     this.batch = batch;
     this.requestConfig = requestConfig;
+    this.options = options;
   }
 
   set(_id, document, options, opType = opTypes.upsert) {
     if (DEVELOPMENT) {
-      require('./check-types').set({ _id, document, options, opType });
+      const errors = require('./check-types')
+        .set({ _id, document, options, opType });
+      if (errors) throw errors;
     }
 
-    const { collection, batch } = this;
+    const { collection, batch, options: { batchEnabled } } = this;
     const { operations } = batch;
     const opsList = operations[collection] = operations[collection] || [];
 
@@ -72,6 +79,23 @@ class Methods {
     }
 
     opsList.push(op);
+
+    const requestSuccessHandler = res => {
+      const scopedResult =  res[collection];
+      if (!scopedResult.ok) {
+        return Promise.reject(scopedResult);
+      }
+      return scopedResult;
+    };
+
+    if (!batchEnabled) {
+      batch.promiseResolver = noop;
+      const res = request(operations, null, 'Mutation', null, this.requestConfig)
+        .then(requestSuccessHandler);
+      batch.flush();
+      return res;
+    }
+
     batch.opResponse = batch.opResponse || new Promise((resolve, reject) => {
       batch.promiseResolver = () => {
         request(operations, null, 'Mutation', null, this.requestConfig)
@@ -81,22 +105,23 @@ class Methods {
     });
     batch.opTimer = batch.opTimer
       || setTimeout(() => batch.flush(), batchDelay);
-    return batch.opResponse.then(res => {
-      return res[collection];
-    });
+    return batch.opResponse.then(requestSuccessHandler);
   }
 
   insert(value) {
     if (DEVELOPMENT) {
-      require('./check-types').insert({ value });
+      const errors = require('./check-types').insert({ value });
+      if (errors) throw errors;
     }
 
-    return this.set(null, value, null, opTypes.insert);
+    return this.set(null, value, null, opTypes.insert)
+      .then(res => res.insertedIds.shift());
   }
 
   update(_id, value) {
     if (DEVELOPMENT) {
-      require('./check-types').update({ _id, value });
+      const errors = require('./check-types').update({ _id, value });
+      if (errors) throw errors;
     }
 
     return this.set(_id, { $set: value }, null, opTypes.update);
@@ -104,7 +129,8 @@ class Methods {
 
   get(_id, options) {
     if (DEVELOPMENT) {
-      require('./check-types').get({ _id, options });
+      const errors = require('./check-types').get({ _id, options });
+      if (errors) throw errors;
     }
 
     return this.query({ _id }, options)
@@ -113,7 +139,8 @@ class Methods {
 
   delete(_id) {
     if (DEVELOPMENT) {
-      require('./check-types').del({ _id });
+      const errors = require('./check-types').del({ _id });
+      if (errors) throw errors;
     }
 
     return this.set(_id, null, null, opTypes.delete);
@@ -121,8 +148,9 @@ class Methods {
 
   query(filter, options, forEach, onError, onComplete) {
     if (DEVELOPMENT) {
-      require('./check-types')
+      const errors = require('./check-types')
         .query({ filter, options, forEach, onError, onComplete });
+      if (errors) throw errors;
     }
 
     const query = [
@@ -135,9 +163,10 @@ class Methods {
 
   aggregate(pipelineStages, options, forEach, onError, onComplete) {
     if (DEVELOPMENT) {
-      require('./check-types').aggregate({
+      const errors = require('./check-types').aggregate({
         pipelineStages, options, forEach, onError, onComplete
       });
+      if (errors) throw errors;
     }
 
     const query = [
@@ -150,7 +179,8 @@ class Methods {
 
   createIndex(fields, options) {
     if (DEVELOPMENT) {
-      require('./check-types').createIndex({ fields, options });
+      const errors = require('./check-types').createIndex({ fields, options });
+      if (errors) throw errors;
     }
 
     const query = [
@@ -175,11 +205,19 @@ function flush() {
   this.opResponse = null;
   this.opTimer = null;
   this.totalRequestContent = '';
+  this.request = null;
 
   return response;
 }
 
-export default (requestConfig) => {
+/**
+ * [creates a reference to a project]
+ * @param  { Object } config [an object of options]
+ * @param { String } config.projectId
+ * @param { Boolean } config.batchEnabled [default = true]
+ * @return { Object }
+ */
+export default (config) => {
   // This state is per project, so requests to different collections
   // are combined.
   const batch = {
@@ -187,6 +225,7 @@ export default (requestConfig) => {
     opResponse: null,
     opTimer: null,
     promiseResolver: null,
+    request: null,
     /*
       Cumulative JSON string payload. This is used to check if payload is too
       large.
@@ -201,7 +240,9 @@ export default (requestConfig) => {
       require('./check-types').collection({ collection });
     }
 
-    return new Methods(collection, batch, requestConfig);
+    const { batchEnabled = true, ...requestConfig } = config;
+    const options = { batchEnabled };
+    return new Methods(collection, batch, options, requestConfig);
   };
 
   return {
