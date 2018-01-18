@@ -29,7 +29,8 @@ export default (
 ) => {
   const { forEach, onError, onComplete } = callbacks || {};
   const {
-    projectID,
+    // use simpler camel case instead of the awkward capitalized ID
+    projectId: projectID,
     dev = false,
     // the following props are only for testing purposes
     origin: customOrigin,

@@ -39,6 +39,17 @@ const defaults = {
   tokenRefreshRate: hoursToMS(2)
 };
 
+const handleError = (data) => Promise.reject(data);
+
+const handleFetch = (res) => {
+  const isError = res.status >= 400;
+  if (isError) {
+    return res.json()
+      .then(handleError);
+  }
+  return res;
+};
+
 const AuthInstance = ({
   // this is for testing purposes only, normally the origin
   // should be pointing the the production server
@@ -79,7 +90,8 @@ const AuthInstance = ({
     const url = constructApiUrl(`/api/access-token/${loginCode}`, projectID, customOrigin);
     return fetch(url, {
       method: 'GET',
-    }).then(res => res.json())
+    }).then(handleFetch)
+      .then(res => res.json())
       .then(json => {
         const { expiresAt, userID } = json;
         if (json.error) {
@@ -92,8 +104,6 @@ const AuthInstance = ({
         });
         authStateChangeFn(userID);
         return json;
-      }).catch(err => {
-        console.error(err);
       });
   };
 
@@ -111,8 +121,6 @@ const AuthInstance = ({
           userId: session.get().userId
         });
         return res;
-      }).catch(err => {
-        console.error(err);
       });
   };
 

@@ -213,9 +213,10 @@ export default class LoginForm extends Component {
     const loginCode = this.state.code;
     this.getAccessToken(loginCode)
       .then(res => {
-        if (res.status === 401) {
-          this.setState({ codeError: res.error });
-        }
+        console.log({ res });
+      }).catch(err => {
+        console.error(err);
+        this.setState({ codeError: err.message });
       });
   }
 

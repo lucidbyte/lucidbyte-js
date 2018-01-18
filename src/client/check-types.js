@@ -10,7 +10,7 @@ export const collection = (props) => {
 export const set = (props) => {
   const types = {
     _id: PropTypes.string,
-    document: PropTypes.object.isRequired,
+    document: PropTypes.object,
     options: PropTypes.object,
     opType: PropTypes.number
   };

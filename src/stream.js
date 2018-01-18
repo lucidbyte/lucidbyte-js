@@ -62,6 +62,10 @@ function Options(opts, onData = noop, hasOnComplete) {
 export const requiredCallbackError = `must provide at least 'onData' or 'onComplete' callback`;
 export const requiredErrorCallbackError = `must provide 'onError' callback`;
 
+const isError = (jsonResponse) => {
+  return ('ok' in jsonResponse) && !jsonResponse.ok;
+};
+
 export default function crossStream(config) {
   const {
     options,
@@ -108,16 +112,16 @@ export default function crossStream(config) {
     response,
     text
   ) {
+    if (error) {
+      return onError(error);
+    }
+
     const _s = opts[STATE];
     const { lastParsedIndex } = opts[STATE];
 
     const isCancelled = !arguments.length;
     if (isCancelled) {
       return onCancel();
-    }
-
-    if (error) {
-      return onError(error);
     }
 
     const contentType = response.xhr.getResponseHeader('Content-Type');
@@ -135,6 +139,9 @@ export default function crossStream(config) {
         onComplete(_s.parsedChunks);
       } else {
         const jsonResponse = JSON.parse(text);
+        if (isError(jsonResponse)) {
+          return onError(jsonResponse);
+        }
         emitData.call(opts, jsonResponse);
         onComplete(jsonResponse);
       }

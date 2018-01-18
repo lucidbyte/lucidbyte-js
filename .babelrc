@@ -4,13 +4,14 @@
       "targets": {
         "browsers": ["last 2 versions"]
       }
-    }]
+    }],
+    "react"
   ],
   "plugins": [
     "transform-object-rest-spread",
     "transform-class-properties",
     "transform-es2015-modules-commonjs",
     "transform-async-to-generator",
-    ["transform-react-jsx", { "pragma":"h" }]
+    ["transform-react-jsx", { "pragma":"h" }],
   ]
 }

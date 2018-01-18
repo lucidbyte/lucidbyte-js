@@ -107,7 +107,8 @@ class Methods {
       require('./check-types').get({ _id, options });
     }
 
-    return this.query({ _id }, options).then(promiseReturnSingleValue);
+    return this.query({ _id }, options)
+      .then(promiseReturnSingleValue);
   }
 
   delete(_id) {
@@ -163,11 +164,6 @@ class Methods {
   getIndexes() {
     const query = [this.collection];
     return request(query, null, 'GetIndexes', null, this.requestConfig);
-  }
-
-  has(_id) {
-    return this.get(_id, { countOnly: 1 })
-      .then(res => !!res.count);
   }
 }
 

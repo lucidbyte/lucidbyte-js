@@ -1,1 +1,1 @@
-export const baseApiUrl = 'https://test.lelandkwong.com';
+export const baseApiUrl = 'https://lucidbyte.com';

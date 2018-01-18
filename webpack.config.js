@@ -3,9 +3,8 @@ const webpack = require('webpack');
 
 const isDev = process.env.NODE_ENV === 'development';
 
-module.exports = {
+const config = {
   entry: {
-    lucidbyte: './src/index.js',
     'lucidbyte-examples': './src/examples/todos/src/index.js',
   },
   output: {
@@ -14,14 +13,12 @@ module.exports = {
     libraryExport: 'default',
     library: 'lucidbyte'
   },
-  devtool: isDev ? 'cheap-module-eval-source-map' : false,
-  devServer: {
-    compress: true,
-    port: 3003,
-    host: '0.0.0.0'
-  },
   module: {
     rules: [
+      {
+        test: /\.css$/,
+        use: [ 'css-loader' ]
+      },
       {
         test: /\.js$/,
         exclude: /(node_modules|bower_components)/,
@@ -31,17 +28,30 @@ module.exports = {
         }
       }
     ]
-  },
-  plugins: [
-    (
-      isDev
-        ? (v) => v
-        : new UglifyJsPlugin()
-    ),
-    new webpack.DefinePlugin({
-      'DEVELOPMENT': isDev,
-      'PRODUCTION': !isDev,
-      // 'process.env.NODE_ENV': JSON.stringify(isDev ? 'development' : 'production')
-    })
-  ]
+  }
 };
+
+if (isDev) {
+  config.entry['lucidbyte-dev'] = './src/index.js',
+  config.devtool = 'cheap-module-eval-source-map';
+  config.devServer = {
+    compress: true,
+    port: 3003,
+    host: '0.0.0.0'
+  };
+  config.plugins = [
+    new webpack.DefinePlugin({
+      DEVELOPMENT: true
+    })
+  ];
+} else {
+  config.entry['lucidbyte'] = './src/index.js',
+  config.plugins = [
+    new UglifyJsPlugin(),
+    new webpack.DefinePlugin({
+      DEVELOPMENT: false
+    })
+  ];
+}
+
+module.exports = config;

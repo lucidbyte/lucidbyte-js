@@ -80,66 +80,125 @@ const HelloInput = ({ style = {}, ...props }) => {
 //     anotherProp: 'foobar'
 //   });
 
-let i = 0;
 const test = {
-  createDocs() {
-    new Array(10000).fill(0).forEach((_, i) => {
-      const lorem = 'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
-      const data = new Array(10).fill(lorem);
+  setDocs() {
+    new Array(30000).fill(0).forEach((_, i) => {
+      const lorem = (_, i) => `Index - ${i} ${Math.random()} ${Math.random()}`;
+      const data = new Array(10).fill('').map(lorem);
       client.collection('manyDocs')
-        .set(`doc_${i}`, {
+        .insert({
           data,
-          index: i,
-          anotherProp: 'foo'
+          // index: i,
+          // anotherProp: 'foo'
         });
-      const batchReady = (i > 0) && ((i + 1) % 100 === 0);
+      const batchReady = (i + 1) % 100 === 0;
       if (batchReady) {
         // response.then(res => console.log(res));
         client.flush();
       }
     });
+    // client.collection('manyDocs').delete('doc_0');
   },
 
   readDocs(_, index) {
     const $manyDocs = client.collection('manyDocs');
     // const start = Now();
 
-    $manyDocs.query(
-      {
-        // anotherProp: { $ne: 'blah' }
-      },
-      {
-        limit: 100,
-        page: Math.round(index / 3),
-        projection: {
-          _id: 1
-        }
-      },
-      function forEach(data) {
-        // console.log(data);
-      }
-    );
+    const limit = 2;
+    const offset = (index % 5) * limit;
+    const ids = new Array(limit).fill(0)
+      .map((_, i) => `doc_${i + offset}`);
 
-    // $manyDocs.query(
-    //   {},
-    //   {
-    //     limit: 100,
-    //     page: Math.round(index / 3),
-    //     projection: {
-    //       data: { $slice: [0, 5] }
-    //     }
-    //   }
-    // );
-    // $manyDocs.query(
-    //   {},
-    //   {
-    //     limit: 100,
-    //     page: Math.round(index / 3),
-    //     projection: {
-    //       data: { $slice: 5 }
-    //     }
-    //   }
-    // );
+    new Array(limit).fill('').forEach((_, i) => {
+      const sliceCount = 20;
+      // const offset = 700;
+      const startIdx = (i * sliceCount) + offset;
+      const stages = [
+        {
+          $match: { _id: { $in: ids } },
+          // anotherProp: 'foo',
+          // anotherProp: { $eq: 'blah' }
+        },
+        {
+          // limit,
+          // page: Math.round(index / 3),
+          $project: {
+            data: { $slice: ['$data', startIdx, sliceCount] },
+            // index: 1,
+            // _id: 0
+          }
+        }
+      ];
+      $manyDocs.aggregate(
+        stages,
+        {},
+        function forEach(data) {
+          if (data.done) {
+            // console.log(data);
+          }
+        }
+      );
+    });
+  },
+
+  aggregation() {
+    const allowedAggregationOperators = [
+      // '$limit',
+      '$match',
+      '$project',
+      '$skip',
+      '$sort',
+      '$sortByCount',
+      '$indexStats',
+      '$sample',
+      '$redact',
+    ].reduce((opMap, op) => {
+      return opMap.set(op, true);
+    }, new Map());
+
+    const pipelines = [
+      // { $skip: 300 },
+      { $limit: 100 },
+      {
+        $project: {
+          foo: 1,
+          _id: 0,
+          // data: { $slice: ['$data', 0, 5] }
+        }
+      }
+      // { $lookup: {
+      //   from: 'r1qSmDBNz_insertTest',
+      //   localField: '_id',
+      //   foreignField: 'foo',
+      //   as: 'maliciousCombo'
+      // } }
+    ];
+
+    const start = Now();
+    for (let i = 0; i < pipelines.length; i++) {
+      const stage = pipelines[i];
+      for (const op in stage) {
+        if (!allowedAggregationOperators.has(op)) {
+          pipelines.splice(i, 1);
+          i--;
+        }
+      }
+    }
+
+    // const ops = JSON.stringify(pipelines).match(/\$[a-z]+/g);
+    console.log({
+      pipelines,
+      took: Now() - start
+    });
+
+    client.collection('helloTest')
+      .aggregate(
+        pipelines
+      ).then((res) => console.log(res));
+
+    client.collection('helloTest')
+      .has('testzzbar')
+      .then(res => console.log(res));
   }
 };
 
@@ -150,19 +209,21 @@ class HelloWorld extends Component {
   }
 
   componentDidMount() {
-    // test.createDocs();
-    // test.readDocs();
-    new Array(100).fill(0).forEach(test.readDocs);
-
     this.$collection = client.collection('helloTest');
 
     // SetupRealtime(projectID, this);
-    lucidbyte.auth(config).onAuthStateChange((state) => {
+    lucidbyte.auth(config).onAuthStateChange(async (state) => {
       console.log('authState', state);
       this.setState({ loggedIn: state.loggedIn });
 
       if (state.loggedIn) {
         this.loadMessage();
+
+        // test.setDocs();
+
+        console.log(
+          client.collection('helloTest')
+        );
       }
     });
   }
@@ -184,8 +245,8 @@ class HelloWorld extends Component {
   }
 
   loadMessage = () => {
-    const handleResult = items => {
-      const item = items[0];
+    const handleResult = item => {
+      console.log(item);
       if (!item) {
         return;
       }
@@ -193,7 +254,7 @@ class HelloWorld extends Component {
         message: item.data.message
       });
     };
-    this.$collection.get('testzzbar')
+    return this.$collection.get('testzzbar')
       .then(handleResult);
   }
 
