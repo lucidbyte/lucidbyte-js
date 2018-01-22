@@ -1,3 +1,5 @@
+/* global DEVELOPMENT */
+
 import session from './session';
 import constructApiUrl from './construct-api-url';
 import constructRequestHeaders from './construct-request-headers';
@@ -134,26 +136,30 @@ const AuthInstance = ({
       Refresh 2 hours from last refresh. This allows us to keep the session fresher
       as long as the user is continuously using it.
      */
-    const delay = expiresIn - tokenDuration + tokenRefreshRate;
+    let delay = expiresIn - tokenDuration + tokenRefreshRate;
+    delay = delay < 0 ? 0 : delay;
 
     hasExpired = expiresIn <= 0;
     if (!hasExpired) {
 
       // log session duration info
-      if (process.env.NODE_ENV === 'development') {
+      if (DEVELOPMENT) {
         const MSToHours = (ms) =>
           Number((ms / msPerHour).toFixed(2));
 
         console.log({
           refreshIn: MSToHours(delay) + 'hrs',
+          duration: tokenDuration,
           expiresIn: MSToHours(expiresIn),
           expiresAt: new Date(expiresAt)
         });
       }
 
       refreshTokenTimer = setTimeout(() => {
+        refreshTokenTimer = null;
         getRefreshToken()
-          .then(scheduleTokenRefresh);
+          .then(scheduleTokenRefresh)
+          .catch(err => console.error(err));
       }, delay);
     } else {
       refreshTokenTimer = null;

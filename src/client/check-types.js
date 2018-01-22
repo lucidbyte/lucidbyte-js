@@ -19,22 +19,22 @@ const validateTypes = (types, args = {}, methodName) => {
       return `Argument '${key}' is required in method 'get'.`;
     }
     if (!isUndefined && !typeCheck(type, val)) {
-      return `Expected argument '${key}' to be of type '${type}' in method '${methodName}'. Received '${val}'.`;
+      return `Expected argument '${key}' to be of type '${type}' in method '${methodName}'. Received ${val}.`;
     }
   }
 };
 
 export const collection = (props) => {
-  const types = { collection: type('string').isRequired };
+  const types = { collection: type('String').isRequired };
   return validateTypes(types, props, 'collection');
 };
 
 export const set = (props) => {
   const types = {
-    _id: type('string'),
-    document: type('Object'),
-    options: type('Object'),
-    opType: type('number'),
+    _id: type('String | Null'),
+    document: type('Object | Null'),
+    options: type('Object | Null'),
+    opType: type('Number'),
   };
   return validateTypes(types, props, 'set');
 };
@@ -49,14 +49,14 @@ export const get = (args) => {
 
 export const del = (props) => {
   const types = {
-    _id: type('string').isRequired,
+    _id: type('String').isRequired,
   };
   return validateTypes(types, props, 'delete');
 };
 
 export const update = (props) => {
   const types = {
-    _id: type('string').isRequired,
+    _id: type('String').isRequired,
     value: type('Object')
   };
   return validateTypes(types, props, 'update');
@@ -66,9 +66,9 @@ export const query = (props) => {
   const types = {
     filter: type('Object'),
     options: type('Object'),
-    forEach: type('Func'),
-    onError: type('Func'),
-    onComplete: type('Func')
+    forEach: type('Function'),
+    onError: type('Function'),
+    onComplete: type('Function')
   };
   return validateTypes(types, props, 'query');
 };
@@ -77,9 +77,9 @@ export const aggregate = (props) => {
   const types = {
     pipelineStages: type('Array').isRequired,
     options: type('Object'),
-    forEach: type('Func'),
-    onError: type('Func'),
-    onComplete: type('Func')
+    forEach: type('Function'),
+    onError: type('Function'),
+    onComplete: type('Function')
   };
   return validateTypes(types, props, 'aggregate');
 };
